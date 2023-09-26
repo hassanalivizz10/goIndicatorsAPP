@@ -1,0 +1,18 @@
+# Go binaries and packages
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.obj
+
+# Output files
+*.out
+*.app
+
+# Ignore .env files
+.env
