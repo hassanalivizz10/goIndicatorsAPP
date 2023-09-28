@@ -23,20 +23,27 @@ func BigDropPullBack(){
 	id                     := current["_id"].(primitive.ObjectID);
 	coinSymbol             := current["coin"].(string)
     pull_back_price        := current["pull_back_price"].(float64)
-	pull_back_created_date := current["created_date"].(time.Time)
 	open_price             := current["open_price"].(float64)
 	drop_price             := current["drop_price"].(float64)
 	trailing_price         := current["trailing_price"].(float64)
 	move                   := current["move"].(float64)
 	created_date           := time.Now()
-	
+	var pull_back_created_date time.Time
+	date_created , ok := current["created_date"].(time.Time)
+	if ok {
+		pull_back_created_date =  date_created
+	}
+	createdDatePrimitive, ok := current["created_date"].(primitive.DateTime)
+	if ok {
+		pull_back_created_date = time.Unix(0, int64(createdDatePrimitive)*int64(time.Millisecond)).UTC()
+	} 
 	pulled_back , err := helpers.GetPullBackPrice(coinSymbol,pull_back_price,pull_back_created_date,false)
 	if err!=nil{
 		fmt.Println("pulled_back error for coin"+coinSymbol,err)
 		bigDropPullBackMutex.Unlock()
 		continue
 	}
-	
+	fmt.Println("pulled_back",pulled_back)
 	if len(pulled_back) == 0{
 		fmt.Println("pulled_back Not Found for coin")
 		bigDropPullBackMutex.Unlock()

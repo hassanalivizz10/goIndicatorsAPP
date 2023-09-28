@@ -20,10 +20,21 @@ func BigRaisePullBack(){
  }
  for _, current := range dropData {
 	bigRaisePullBackMutex.Lock()
+	var pull_back_created_date time.Time
+	date_created , ok := current["created_date"].(time.Time)
+	if ok {
+		pull_back_created_date =  date_created
+	}
+	createdDatePrimitive, ok := current["created_date"].(primitive.DateTime)
+	if ok {
+		pull_back_created_date = time.Unix(0, int64(createdDatePrimitive)*int64(time.Millisecond)).UTC()
+	} 
+	
+	fmt.Println("pull_back_created_date",pull_back_created_date)
 	id                     := current["_id"].(primitive.ObjectID);
 	coinSymbol             := current["coin"].(string)
     pull_back_price        := current["pull_back_price"].(float64)
-	pull_back_created_date := current["created_date"].(time.Time)
+	
 	open_price             := current["open_price"].(float64)
 	raise_price            := current["raise_price"].(float64)
 	trailing_price         := current["trailing_price"].(float64)
@@ -36,7 +47,7 @@ func BigRaisePullBack(){
 		bigRaisePullBackMutex.Unlock()
 		continue
 	}
-	
+	fmt.Println("raised_back",raised_back)
 	if len(raised_back) == 0{
 		fmt.Println("raised_back Not Found for coin")
 		bigRaisePullBackMutex.Unlock()
