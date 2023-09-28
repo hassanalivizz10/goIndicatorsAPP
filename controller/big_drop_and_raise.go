@@ -25,7 +25,7 @@ var bigDropFactorValue  float64  =  5
 var bigRaiseFactorValue float64 = 3.5
 
 type CoinData struct {
-	Symbol                 string 
+	Symbol                 string   
 	OpenPrice              float64
 	PerMove                float64
 	DropPercValue          float64

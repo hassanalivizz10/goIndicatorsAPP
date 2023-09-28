@@ -21,7 +21,7 @@ func BigRaisePullBack(){
  for _, current := range dropData {
 	bigRaisePullBackMutex.Lock()
 	id                     := current["_id"].(primitive.ObjectID);
-	coinSymbol             := current["symbol"].(string)
+	coinSymbol             := current["coin"].(string)
     pull_back_price        := current["pull_back_price"].(float64)
 	pull_back_created_date := current["created_date"].(time.Time)
 	open_price             := current["open_price"].(float64)
