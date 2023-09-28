@@ -71,34 +71,62 @@ func StrategyCron(){
 }
 
 func getStrategies() (*StrategyResponse, error) {
+	// url := "http://rules.digiebot.com/apiEndPoint/getAllCoinsHavingTradeSettings/1"
+	// client := http.Client{}
+	// req, err := http.NewRequest("POST", url, nil)
+	// if err != nil {
+	// 	fmt.Println("err",err)
+	// 	return nil, err
+	// }
+
+	// req.Header.Add("postman-token", "54617d62-35b8-4630-25df-7f512d389f6e")
+	// req.Header.Add("cache-control", "no-cache")
+	// req.Header.Add("Authorization", "OverLimit#_cgA3s8VSQj")
+	// req.Header.Add("content-type", "application/json")
+
+	// resp, err := client.Do(req)
+	// if err != nil {
+	// 	fmt.Println("err",err)
+	// 	return nil, err
+	// }
+	// defer resp.Body.Close()
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// fmt.Println("body",resp.Body)
+
+	// // Check if the status code is 200
+	// if resp.StatusCode != http.StatusOK {
+	// 	return nil, fmt.Errorf("Non-200 status code: %d", resp.StatusCode)
+	// }
+
 	url := "http://rules.digiebot.com/apiEndPoint/getAllCoinsHavingTradeSettings/1"
-	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	method := "POST"
+
+	client := &http.Client {
+	}
+	req, err := http.NewRequest(method, url, nil)
+
 	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("postman-token", "54617d62-35b8-4630-25df-7f512d389f6e")
-	req.Header.Set("cache-control", "no-cache")
-	req.Header.Set("authorization", "OverLimit#_cgA3s8VSQj")
-	req.Header.Set("content-type", "application/json")
-
-	resp, err := client.Do(req)
+		fmt.Println(err)
+		return nil , err
+	} 
+	   // Set the authorization header to one of the expected values
+	   req.Header.Add("Authorization", "OverLimit#_cgA3s8VSQj") // Or use "OverLimit#_ubN7iC5W7D"
+	res, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		return nil , err
 	}
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
-	// Check if the status code is 200
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Non-200 status code: %d", resp.StatusCode)
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		return nil , err
 	}
-
+	fmt.Println(string(body))
 	var result StrategyResponse
 	err = json.Unmarshal(body, &result)
 	if err != nil {
