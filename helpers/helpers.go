@@ -3,6 +3,7 @@ package helpers
 import(
 	"go.mongodb.org/mongo-driver/bson"
 	"indicatorsAPP/mongohelpers"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
 	"fmt"
 )
@@ -394,10 +395,140 @@ func FetchMarketPrices(coin string,timestamp time.Time) ([]bson.M,error) {
 }
 
 func AddRaiseDropEntry(filters bson.M, toSet bson.M , upsert bool) error{
-	collectionName := "big_drop_and_pull_back_track_testing"
+	collectionName := "big_drop_and_pull_back_track"
 	err := mongohelpers.MongoUpdateOne(collectionName,filters,toSet,upsert)
 	if err !=nil{
 		return err
 	}
 	return nil
+}
+
+func FetchRaiseORDropEmptyPullBackTime(filterType string) ([]bson.M,error) {
+	collectionName := "big_drop_and_pull_back_track"
+	var limit int64 = 0
+	var sortOrder int = 1
+	var sortBy string = "coin"
+	filters  := bson.M{
+		"type":                   filterType,
+		"pull_back_time":  bson.M{"$exists":false},
+	}
+	projection := bson.M{
+	}
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
+func GetPullBackPrice(coin string,price float64,startTime time.Time,raise bool) ([]bson.M,error){
+	collectionName := "market_prices"
+	var limit int64 = 1
+	var sortOrder int = -1
+	var sortBy string = "created_date"
+	filters  := bson.M{
+		"coin":                   coin,
+		"created_date":  bson.M{"$gte":startTime},
+	}
+	if raise{
+		filters["price"] = bson.M{"$lte":price}
+	} else {
+		filters["price"] = bson.M{"$gte":price}
+	}
+	projection := bson.M{
+		"created_date":1,
+		"price":1,
+	}
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
+func UpdatePullBackTime(id primitive.ObjectID) error{
+	collectionName := "big_drop_and_pull_back_track"
+	filters := bson.M{
+		"_id" : id,
+	}
+	upsert := false
+	toSet := bson.M{
+		"$set":bson.M{
+			"pull_back_time":time.Now(),
+			"completed":1,
+			
+		},
+	}
+	err := mongohelpers.MongoUpdateOne(collectionName,filters,toSet,upsert)
+	if err !=nil{
+		return err
+	}
+	return nil	
+}
+
+func UpdateMarketTrendingEntry(coin string,raise bool)error{
+	collectionName := "market_trending"
+	filters := bson.M{
+		"coin" : coin,
+	}
+	upsert := false
+	update := bson.M{}
+	if raise {
+		update["big_raise_pull_back"] = "yes"
+	} else {
+		update["big_drop_pull_back"] = "yes"
+	}
+	toSet := bson.M{
+		"$set":update,
+	}
+	err := mongohelpers.MongoUpdateOne(collectionName,filters,toSet,upsert)
+	if err !=nil{
+		return err
+	}
+	return nil	
+}
+
+func AddCandleTrack(data bson.M) error{
+	collectionName := "big_drop_and_pull_back_track_for_candle"
+	_ , err := mongohelpers.MongoInsertOne(collectionName,data)
+	if err !=nil{
+		return err
+	}
+	return nil
+}
+
+func ToFloat64(value interface{}) (float64, bool) {
+    switch v := value.(type) {
+    case int:
+        return float64(v), true
+    case int64:
+        return float64(v), true
+    case float32:
+        return float64(v), true
+    case float64:
+        return v, true
+    default:
+        return 0, false
+    }
+}
+
+
+func UpdateStrategyValue(id primitive.ObjectID,strategy,coin string) error{
+	collectionName := "market_chart"
+	filters := bson.M{
+		"_id" : id,
+		"coin":coin,
+	}
+	upsert := false
+	toSet := bson.M{
+		"$set":bson.M{
+			"strategy":strategy,
+			
+		},
+	}
+	err := mongohelpers.MongoUpdateOne(collectionName,filters,toSet,upsert)
+	if err !=nil{
+		return err
+	}
+	return nil	
 }

@@ -17,7 +17,7 @@ var mongoDB *mongo.Database
 
 func ConnectToMongoDB() error {
 	mongoURI := utils.GetEnv("MONGO_URI")
-	fmt.Println("mongoURI",mongoURI)
+	//fmt.Println("mongoURI",mongoURI)
 	if mongoURI == "" {
 		return fmt.Errorf("MONGO_URI environment variable is not set")
 	}

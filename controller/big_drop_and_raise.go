@@ -19,7 +19,7 @@ import (
 var lastHourReset time.Time
 var openPrices []CoinData
 var coinListCache []bson.M
-var buyMutex sync.Mutex
+var bigDropRaiseMutex sync.Mutex
 // Defaults ....
 var bigDropFactorValue  float64  =  5
 var bigRaiseFactorValue float64 = 3.5
@@ -41,9 +41,9 @@ type CoinData struct {
 
 
 /*
-buyMutex.Lock() // Acquire the mutex
+bigDropRaiseMutex.Lock() // Acquire the mutex
 // Access the shared resource
-buyMutex.Unlock() // Release the mutex when done
+bigDropRaiseMutex.Unlock() // Release the mutex when done
 */
 //ruleType := "buy"
 func RunBigRaiseAndBigDrop(){
@@ -59,7 +59,7 @@ func RunBigRaiseAndBigDrop(){
 	if len(coinListCache) ==0 {
 		coinList , err := helpers.ListCoins()
 		if err!=nil{
-			fmt.Println("eerr",err)
+			fmt.Println("Big Raise and Drop Error",err)
 			return
 		}
 		coinListCache = coinList
@@ -69,23 +69,23 @@ func RunBigRaiseAndBigDrop(){
 	for _, currentCoin := range coinListCache {
 		coinSymbol := currentCoin["symbol"].(string)
 		fmt.Println("coinSymbol"+coinSymbol,time.Now().UTC())
-		buyMutex.Lock()
+		bigDropRaiseMutex.Lock()
 		foundPriceObject := findPriceObject(coinSymbol, currentHourDate)
 		if foundPriceObject != nil {
 			fmt.Println("Big Drop Found in foundPriceObject for coin:", coinSymbol, *foundPriceObject)
-			buyMutex.Unlock()
+			bigDropRaiseMutex.Unlock()
 			continue
 		}
 		bodyMoveAverage, err := helpers.GetBodyMoveAverage(coinSymbol)
 		//fmt.Println("bodyMoveAverage",bodyMoveAverage)
 		if err!=nil{
 			fmt.Println("bodyMoveAverage Error "+coinSymbol,err)
-			buyMutex.Unlock()
+			bigDropRaiseMutex.Unlock()
 			continue
 		}
 		if len(bodyMoveAverage) == 0 || len(bodyMoveAverage[0]) == 0 {
 			fmt.Println("bodyMoveAverage is empty "+coinSymbol,bodyMoveAverage)
-			buyMutex.Unlock()
+			bigDropRaiseMutex.Unlock()
 			continue
 		}
 		
@@ -101,7 +101,7 @@ func RunBigRaiseAndBigDrop(){
 		currentOpenPrice, err := getOpenPrice(coinSymbol)
 		if err != nil {
 			fmt.Println("Error fetching open price for", coinSymbol, ":", err)
-			buyMutex.Unlock()
+			bigDropRaiseMutex.Unlock()
 		}
 
 		DropTrailingPrice  := currentOpenPrice - ((currentOpenPrice * DropPercValue) / 100)
@@ -122,7 +122,7 @@ func RunBigRaiseAndBigDrop(){
 		}
 
 		openPrices = append(openPrices, priceObject)
-		buyMutex.Unlock()
+		bigDropRaiseMutex.Unlock()
 	} // ends coinListCache forLoop
 	fmt.Println("Time Now Data",time.Now().UTC())
 	
@@ -152,26 +152,11 @@ func RunBigRaiseAndBigDrop(){
 			fmt.Println("Found Empty on FetchMarketPrices"+coin)
 		}
 		var currentPrice float64
-		var hasError bool = false
-		switch v := pricesData[0]["price"].(type) {
-		case int:
-			currentPrice = float64(v)
-			fmt.Println("Converted to float64:", currentPrice)
-		case int64:
-			currentPrice = float64(v)
-			fmt.Println("Converted to float64:", currentPrice)
-		case float32:
-			currentPrice = float64(v)
-			fmt.Println("Converted to float64:", currentPrice)
-		case float64:
-			currentPrice = v
-			fmt.Println("Already a float64:", currentPrice)
-		default:
-			hasError = true
-			fmt.Println("Unsupported numeric type")
-		}
-		if hasError{
-			fmt.Println("Unsupported numeric type errored")
+	
+
+		currentPrice , ok := helpers.ToFloat64(pricesData[0]["price"])
+		if !ok{
+			fmt.Println("currentPrice Unsupported numeric type errored")
 			continue;
 		}
 		//currentPrice := pricesData[0]["price"].(float64)
