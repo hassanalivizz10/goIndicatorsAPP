@@ -79,7 +79,7 @@ func getStrategies() (*StrategyResponse, error) {
 	// Set request headers
 	// Set custom headers
     headers := map[string]string{
-        "Authorization": "overlimitrequest",        // Replace with your authorization token
+        "Authorization": "OverLimit#_ubN7iC5W7D",        // Replace with your authorization token
         "Content-Type":  "application/json",            // Add any other headers you need
     }	
 	client := resty.New()
