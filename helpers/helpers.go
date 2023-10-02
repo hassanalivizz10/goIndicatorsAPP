@@ -499,7 +499,9 @@ func AddCandleTrack(data bson.M) error{
 
 func ToFloat64(value interface{}) (float64, bool) {
     switch v := value.(type) {
-    case int:
+	case int:
+        return float64(v), true
+    case int32:
         return float64(v), true
     case int64:
         return float64(v), true
@@ -507,6 +509,12 @@ func ToFloat64(value interface{}) (float64, bool) {
         return float64(v), true
     case float64:
         return v, true
+    case uint:
+        return float64(v), true
+    case uint32:
+        return float64(v), true
+    case uint64:
+        return float64(v), true
     default:
         return 0, false
     }

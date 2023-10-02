@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-
+	fmt.Println("HEELO THERE")	
     defer func() {
 		if r := recover(); r != nil {
 			// Get the stack trace information
