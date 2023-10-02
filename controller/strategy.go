@@ -1,8 +1,9 @@
 package controller
 import (
 	"fmt"
-	"net/http"
-	"io/ioutil"
+	//"time"
+	"github.com/go-resty/resty/v2"
+	//"io/ioutil"
 	"encoding/json"
 	"indicatorsAPP/helpers"
 	"go.mongodb.org/mongo-driver/bson"
@@ -71,67 +72,33 @@ func StrategyCron(){
 }
 
 func getStrategies() (*StrategyResponse, error) {
-	// url := "http://rules.digiebot.com/apiEndPoint/getAllCoinsHavingTradeSettings/1"
-	// client := http.Client{}
-	// req, err := http.NewRequest("POST", url, nil)
-	// if err != nil {
-	// 	fmt.Println("err",err)
-	// 	return nil, err
-	// }
-
-	// req.Header.Add("postman-token", "54617d62-35b8-4630-25df-7f512d389f6e")
-	// req.Header.Add("cache-control", "no-cache")
-	// req.Header.Add("Authorization", "OverLimit#_cgA3s8VSQj")
-	// req.Header.Add("content-type", "application/json")
-
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	fmt.Println("err",err)
-	// 	return nil, err
-	// }
-	// defer resp.Body.Close()
-	// body, err := ioutil.ReadAll(resp.Body)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println("body",resp.Body)
-
-	// // Check if the status code is 200
-	// if resp.StatusCode != http.StatusOK {
-	// 	return nil, fmt.Errorf("Non-200 status code: %d", resp.StatusCode)
-	// }
+	
 
 	url := "http://rules.digiebot.com/apiEndPoint/getAllCoinsHavingTradeSettings/1"
-	method := "POST"
+	
+	// Set request headers
+	// Set custom headers
+    headers := map[string]string{
+        "Authorization": "overlimitrequest",        // Replace with your authorization token
+        "Content-Type":  "application/json",            // Add any other headers you need
+    }	
+	client := resty.New()
 
-	client := &http.Client {
-	}
-	req, err := http.NewRequest(method, url, nil)
+    request := client.R().SetHeaders(headers)
 
-	if err != nil {
-		fmt.Println(err)
-		return nil , err
-	} 
-	   // Set the authorization header to one of the expected values
-	   req.Header.Add("Authorization", "OverLimit#_cgA3s8VSQj") // Or use "OverLimit#_ubN7iC5W7D"
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return nil , err
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return nil , err
-	}
-	fmt.Println(string(body))
-	var result StrategyResponse
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return nil, err
-	}
+    
+    resp, err := request.Execute("GET", url)
+    if err != nil {
+        return nil, err
+    }
+    fmt.Println("result",resp.String())	
+	 // Read and parse the JSON response into a struct
+	 var result StrategyResponse
+	err = json.Unmarshal(resp.Body(),&result)
+    if err != nil {
+        fmt.Println(err)
+        return nil, err
+    }
 
 	return &result, nil
 }

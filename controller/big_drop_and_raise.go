@@ -72,7 +72,7 @@ func RunBigRaiseAndBigDrop(){
 		bigDropRaiseMutex.Lock()
 		foundPriceObject := findPriceObject(coinSymbol, currentHourDate)
 		if foundPriceObject != nil {
-			fmt.Println("Big Drop Found in foundPriceObject for coin:", coinSymbol, *foundPriceObject)
+			//fmt.Println("Big Drop Found in foundPriceObject for coin:", coinSymbol, *foundPriceObject)
 			bigDropRaiseMutex.Unlock()
 			continue
 		}
