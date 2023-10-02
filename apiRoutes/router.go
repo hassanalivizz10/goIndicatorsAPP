@@ -4,14 +4,14 @@ import (
 
   
     "github.com/gin-gonic/gin"
-    ///"indicatorsAPP/api"
+    "indicatorsAPP/api"
 )
 
 func SetupRouter() *gin.Engine {
     router := gin.Default()
 
     // Define API routes and attach handlers
-    //router.POST("/createUpdateDailyIndicators",api.CreateUpdateDailyIndicatorsHandler)
+    router.POST("/createUpdateDailyIndicators",api.CreateUpdateDailyIndicatorsHandler)
     // router.GET("/api/resource", handler.GetResource)
     // Add more routes here
 

@@ -5,6 +5,7 @@ import(
 	"indicatorsAPP/mongohelpers"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+	"strconv"
 	"fmt"
 )
 
@@ -128,7 +129,42 @@ func LastCandelTrends(coin string,timestamp time.Time,filtertype string) ([]bson
 	return docs , nil
 }
 
-
+func GetDailyCandleData(coin string,startDate,endDate time.Time,limit int64) ([]bson.M, error){
+		// filters
+		filters := bson.M{
+			"coin":         coin,
+			"created_date": bson.M{"$gte": startDate, "$lte": endDate},
+		}
+	
+		collectionName := "market_chart_daily"
+		projection := bson.M{
+			"created_date":            1,
+			"dpup_trend_direction":    1,
+			"UP1_perc":                1,
+			"UP2_perc":                1,
+			"UP3_perc":                1,
+			"DP1_perc":                1,
+			"DP2_perc":                1,
+			"DP3_perc":                1,
+			"open":                    1,
+			"daily_trend":             1,
+			"coin":                    1,
+			"low":                     1,
+			"high":                    1,
+			"candle_color":            1,
+			"close":                   1,
+			"openTime_human_readible": 1,
+			"closeTime_human_readible": 1,
+		}
+		
+		var sortOrder int  = -1
+		sortBy := "created_date"
+		docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+		if err!=nil{
+			return []bson.M{} , err
+		}
+		return docs , nil
+}
 func GetDailyData(coin string,date time.Time,durationLimit int) ([]bson.M, error){
 	// filters processing
 	//duration := time.Duration(durationLimit)
@@ -539,4 +575,15 @@ func UpdateStrategyValue(id primitive.ObjectID,strategy,coin string) error{
 		return err
 	}
 	return nil	
+}
+
+func ConvertStrNumbersToFloat(number string) (float64,error){
+	f, err := strconv.ParseFloat(number, 64)
+	return f, err
+}
+
+func UpdateDailyData(filters,update bson.M) error{
+	collectionName := "market_chart_daily"
+	err := mongohelpers.MongoUpdateOne(collectionName,filters,update,false)
+	return err
 }

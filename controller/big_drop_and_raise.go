@@ -153,7 +153,7 @@ func RunBigRaiseAndBigDrop(){
 		}
 		var currentPrice float64
 	
-		fmt.Println("pricess",pricesData[0]["price"])
+		//fmt.Println("pricess",pricesData[0]["price"])
 		currentPrice , ok := helpers.ToFloat64(pricesData[0]["price"])
 		if !ok{
 			fmt.Println("currentPrice Unsupported numeric type errored")

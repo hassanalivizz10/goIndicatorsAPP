@@ -11,6 +11,7 @@ import (
 	//"indicatorsAPP/mongohelpers"
 	 "github.com/gin-gonic/gin"
 	 "go.mongodb.org/mongo-driver/bson"
+	 "go.mongodb.org/mongo-driver/bson/primitive"
 )
 // POST METHOD to Calculate Daily Indicators
 func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
@@ -75,32 +76,25 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 			})
 			return
 		}
-		startOver := 0
 		coin := jsonData["coin"].(string)
-		if val, ok := jsonData["forcerun"]; ok {
-			// "forcerun" key exists, try to assert it as a string
-			if forceRunStr, ok := val.(string); ok {
-				// Successfully extracted the value as a string
-				if forceRunStr!=""{
-					startOver = 1
-				}
-			} 
-		}
 		
-
-		// dpup indicator
-		dpupDirection, _ := dpupTrendDirectionCalculations(coin, startDate, diffInDays, startOver)
-
-		// daily trends
-		getTrend, _ := calculateDailyTrend(coin, startDate, diffInDays, startOver)
-
-		response := map[string]interface{}{
-			"dpup_direction": dpupDirection,
-			"getTrend":       getTrend,
+		responseSlice := []map[string]interface{}{}
+		for i := 0; i <= diffInDays; i++ {
+			setStartDate := startDate.AddDate(0, 0, diffInDays) // years, months, days
+			// Set the time components for the start and end dates
+			fromDate := time.Date(setStartDate.Year(), setStartDate.Month(), setStartDate.Day(), 0, 0, 0, 0, time.UTC)
+			toDate := time.Date(setStartDate.Year(), setStartDate.Month(), setStartDate.Day(), 23, 59, 59, 999999999, time.UTC)
+			dpupDirection , _ := dpupTrendDirectionCalculations(coin,fromDate,toDate)
+			getTrend, _ := calculateDailyTrend(coin, fromDate, toDate)
+			response := map[string]interface{}{
+				"dpup_direction": dpupDirection,
+				"getTrend":       getTrend,
+			}	
+			responseSlice = append(responseSlice, response)
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"status":  200,
-			"data":    response, // Replace with your data
+			"data":    responseSlice, // Replace with your data
 			"error":   nil, // Handle errors if necessary
 			"message": "Success",
 		})
@@ -775,244 +769,191 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 }
 
 
-func dpupTrendDirectionCalculations(coin string, startDate time.Time, diffInDays int, startOver int) ([]map[string]interface{}, error) {
-	var getTrend []map[string]interface{}
-	var final []interface{}
+func dpupTrendDirectionCalculations(coin string, startDate , endDate  time.Time) (map[string]interface{}, error) {
+	var getTrend map[string]interface{}
+	getTrend = make(map[string]interface{})
 
-	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
-
-	for i := 0; i <= diffInDays; i++ {
-		//var newDpupTrendDirection string
-		dateToGet := startDate.AddDate(0, 0, i)
-		currentData, err := helpers.GetDailyData(coin, dateToGet, 0)
-		if err != nil {
-			// Candle is missing for this hour.
-			continue
-		}
-
-		dataToParse := []interface{}{currentData}
-		final = append(final, dataToParse)
+	var limit int64 = 1
+	candleData ,err := helpers.GetDailyCandleData(coin,startDate,endDate,limit)
+	if err != nil {
+		fmt.Println("dpupTrendDirectionCalculations GetDailyCandleData Error",err.Error())
+		return nil , err
 	}
 
-	if len(final) == 0 {
-		// No Candles found.
-		return getTrend, nil
+	if len(candleData) == 0 {
+		fmt.Println("dpupTrendDirectionCalculations GetDailyCandleData is Empty")
+		return getTrend,  fmt.Errorf("dpupTrendDirectionCalculations GetDailyCandleData is Empty")
 	}
+	currentCandle := candleData[0]
+	//fmt.Println("candleData",candleData)
+	// Access individual values by key
+	keysToCheck := []string{"DP1_perc", "DP2_perc", "DP3_perc","UP1_perc", "UP2_perc", "UP3_perc"}
+	noErrors := true
+	values := make(map[string]float64)
 
-	var counter int
-	var historyArr []map[string]interface{}
-	for _, data := range final {
-		temp33 := make(map[string]interface{})
-		var newDpupTrendDirection string
-		var lastDpupTrendDirection string
-		datatoupdate := data.([]interface{})[0]
-		current := datatoupdate.([]interface{})[0].(map[string]interface{})
-		currentDay, err := time.Parse(time.RFC3339, current["openTime_human_readible"].(string))
-		if err != nil {
-			return nil, err
+	for _, key := range keysToCheck {
+		if val, ok := currentCandle[key]; ok {
+            if strVal, isString := val.(string); isString {
+				//fmt.Println("strVal",strVal)
+				//fmt.Println("key",key)
+				
+                if num, err := helpers.ConvertStrNumbersToFloat(strVal); err == nil {
+                    values[key] = num
+                } else {
+					//fmt.Println("errerr",err)
+					noErrors = false
+					break
+                }
+            }
+        } else {
+			noErrors = false
+			break
 		}
-		temp33["currentDay"] = currentDay
-
-		if startOver == 1 && counter == 0 {
-			newDpupTrendDirection = "up"
-		} else {
-			lastDayData, err := helpers.LastIndicatorValue(coin, currentDay, "dpup_trend_direction")
-			if err != nil {
-				return nil, err
-			}
-
-			if len(lastDayData) == 0 {
-				temp33["lastDpupTrendDirection"] = nil
-				continue
-			} else {
-				lastDpupTrendDirection = lastDayData[0]["dpup_trend_direction"].(string)
-				temp33["lastDpupTrendDirection"] = lastDpupTrendDirection
-			}
-
-			dp1Perc := current["DP1_perc"].(float64)
-			dp2Perc := current["DP2_perc"].(float64)
-			dp3Perc := current["DP3_perc"].(float64)
-			up1Perc := current["UP1_perc"].(float64)
-			up2Perc := current["UP2_perc"].(float64)
-			up3Perc := current["UP3_perc"].(float64)
-
-			if lastDpupTrendDirection == "up" {
-				mes := fmt.Sprintf("%.2f,%.2f,%.2f", dp1Perc, dp2Perc, dp3Perc)
-				fmt.Println("up", mes)
-				if (dp1Perc > 0 && dp1Perc <= 90) && (dp2Perc > 0 && dp2Perc <= 90) && (dp3Perc > 0 && dp3Perc <= 90) {
-					newDpupTrendDirection = "down"
-				} else {
-					if (dp1Perc > 0 && dp1Perc <= 10) && ((dp3Perc == 0 || dp3Perc > 80)) {
-						newDpupTrendDirection = "down"
-					} else {
-						newDpupTrendDirection = lastDpupTrendDirection
-					}
-				}
-			}
-
-			if lastDpupTrendDirection == "down" {
-				mes := fmt.Sprintf("%.2f,%.2f,%.2f", up1Perc, up2Perc, up3Perc)
-				fmt.Println("down", mes)
-				if (up1Perc > 0 && up1Perc <= 90) && (up2Perc > 0 && up2Perc <= 90) && (up3Perc > 0 && up3Perc <= 90) {
-					newDpupTrendDirection = "up"
-				} else {
-					if (up1Perc > 0 && up1Perc <= 10) && ((up3Perc == 0 || up3Perc > 80)) {
-						newDpupTrendDirection = "up"
-					} else {
-						newDpupTrendDirection = lastDpupTrendDirection
-					}
-				}
-			}
-		}
-
-		temp33["_id"] = current["_id"]
-		temp33["openTime_human_readible"] = current["openTime_human_readible"].(string)
-		temp33["newDpupTrendDirection"] = newDpupTrendDirection
-		historyArr = append(historyArr, temp33)
-		counter++
-		//updateDailyCandleTrends("dpup_trend_direction", newDpupTrendDirection, current["_id"].(string))
 	}
-
-	return historyArr, nil
+	if !noErrors{
+		fmt.Println("DP or UP perc values are not present or not in string format")
+		return nil , fmt.Errorf("DP or UP perc values are not present or not in string format")
+	}
+	var dpup_trend_direction string = "up"  //default values
+	var new_dpup_trend_direction string = "up" // default values
+	value, exists := currentCandle["dpup_trend_direction"]
+	if exists{
+		_ , ok := value.(string)
+		if ok{
+			dpup_trend_direction = value.(string)
+		}
+	}
+	if dpup_trend_direction == "up"{
+		if ((values["DP1_perc"] > 0 && values["DP1_perc"] <= 90) && (values["DP2_perc"] > 0 && values["DP2_perc"] <= 90) && (values["DP3_perc"] > 0 && values["DP3_perc"] <= 90)){
+			new_dpup_trend_direction = "down"
+		}  else if ((values["DP1_perc"] > 0 && values["DP1_perc"] <= 90) && (values["DP3_perc"]) == 0 || values["DP3_perc"] > 80) {
+			new_dpup_trend_direction = "down"
+		}
+	}
+	if dpup_trend_direction == "down"{
+		if ((values["UP1_perc"] > 0 && values["UP1_perc"] <= 90) && (values["UP2_perc"] > 0 && values["UP2_perc"] <= 90) && (values["UP3_perc"] > 0 && values["UP3_perc"] <= 90)){
+			new_dpup_trend_direction = "up"
+		}  else if ((values["UP1_perc"] > 0 && values["UP1_perc"] <= 90) && (values["UP3_perc"]) == 0 || values["UP3_perc"] > 80) {
+			new_dpup_trend_direction = "up"
+		}
+	}
+	filters := bson.M{
+		"_id":currentCandle["_id"].(primitive.ObjectID),
+	}
+	update := bson.M{
+		"$set":bson.M{
+			"dpup_trend_direction":new_dpup_trend_direction,
+		},
+	}
+	err = helpers.UpdateDailyData(filters, update) 
+	getTrend["dpup_trend_direction"] = 	new_dpup_trend_direction
+	
+	// update method here
+	return getTrend , nil
 }
 
 
-func calculateDailyTrend(coin string, startDate time.Time, diffInDays int, startOver int) ([]map[string]interface{}, error) {
+func calculateDailyTrend(coin string, startDate , endDate time.Time) (map[string]interface{}, error) {
 	fmt.Println("inside Daily Trend")
 
-	var getTrend []map[string]interface{}
-	var final []interface{}
+	var getTrend map[string]interface{}
+	var limit int64 = 2
+	getTrend = make(map[string]interface{})
 
-	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
-	//today := time.Now().UTC().UTC().Truncate(24 * time.Hour)
-
-	for i := 0; i <= diffInDays; i++ {
-		dateToGet := startDate.AddDate(0, 0, i)
-		currentData, err := helpers.GetDailyData(coin, dateToGet, 0)
-		if err != nil {
-			// Candle is missing for this hour.
-			continue
-		}
-
-		dataToParse := []interface{}{currentData}
-		final = append(final, dataToParse)
+	// we need current and latest previous , i..e, two candles
+	// adjust the start Date
+	startDate = startDate.AddDate(0, 0, -1)
+	candlesData ,err := helpers.GetDailyCandleData(coin,startDate,endDate,limit)
+	if err != nil {
+		fmt.Println("calculateDailyTrend candlesData Error",err.Error())
+		return nil , err
 	}
 
-	if len(final) == 0 {
-		return getTrend, nil
+	if len(candlesData) == 0 || len(candlesData) < 2 {
+		fmt.Println("calculateDailyTrend candlesData is Empty or has Lenght less than two")
+		return getTrend, fmt.Errorf("calculateDailyTrend candlesData is Empty or has Lenght less than two")
 	}
 
-	var finalUpdate []map[string]interface{}
-	counter := 0
-	for _, data := range final {
-		counter++
-		tempObject := make(map[string]interface{})
-		var newTrend string
-		datatoupdate := data.([]interface{})[0]
-		current := datatoupdate.([]interface{})[0].(map[string]interface{})
-
-		if len(current) == 0 {
-			continue
+	// process the candles data accordingly.... sort by created date desc applied. 
+	currentCandle  := candlesData[0]  // first index will be current
+	previousCandle := candlesData[1] // second will be the previous 
+	var (current_daily_trend string  
+		new_trend string 		
+		currentcandle_color string = "red" 
+		candle_color string = "red")
+	trend_value , exists := currentCandle["daily_trend"]
+	if exists{
+		_ , ok := trend_value.(string)
+		if ok {
+			current_daily_trend = trend_value.(string)
 		}
+	}
+	currentClose := currentCandle["close"].(float64)
+	currentOpen  := currentCandle["open"].(float64)
+	if currentClose > currentOpen {
+		currentcandle_color = "green"
+	}
+	previousClose := previousCandle["close"].(float64)
+	previousOpen  := previousCandle["open"].(float64)
+	previousLow := previousCandle["low"].(float64)
+	previousHigh := previousCandle["high"].(float64)
+	if previousClose > previousOpen {
+		candle_color = "green"
+	}
 
-		currentDay, err := time.Parse(time.RFC3339, current["openTime_human_readible"].(string))
-		if err != nil {
-			return nil, err
-		}
-
-		datetoget := currentDay.AddDate(0, 0, -1)
-		previous, err := helpers.GetDailyData(coin, datetoget, 0)
-		if err != nil {
-			fmt.Println("No Previous Data", currentDay)
-			lastDayData, err := helpers.LastIndicatorValue(coin, currentDay, "daily_trend")
-			if err != nil {
-				return nil, err
-			}
-			tempObject["lastopenTime_human_readible"] = nil
-			newTrend = lastDayData[0]["daily_trend"].(string)
-		} else {
-			if startOver == 1 && counter == 1 {
-				tempObject["lastopenTime_human_readible"] = nil
-				newTrend = "up"
+	if (current_daily_trend == "" || current_daily_trend == "up"){
+		if candle_color == "red"{
+			if currentClose < previousClose {
+				new_trend = "down"
 			} else {
-				previousTrend := previous[0]["daily_trend"].(string)
-				tempObject["lastopenTime_human_readible"] = previous[0]["openTime_human_readible"].(string)
-
-				if previousTrend != "" && previousTrend != "null" {
-					newTrend = previousTrend
+				new_trend = "up"
+			}	
+		} else if candle_color == "green"{
+			if currentcandle_color == "red"{
+				if currentClose < previousLow {
+					new_trend = "down"
 				} else {
-					lastDayData, err := helpers.LastIndicatorValue(coin, currentDay, "daily_trend")
-					if err != nil {
-						return nil, err
-					}
-					trend := lastDayData[0]["daily_trend"].(string)
-					fmt.Println("previousTrend", previousTrend, trend, currentDay)
-
-					currentClose := current["close"].(float64)
-					currentOpen := current["open"].(float64)
-					currentCandleColor := ""
-
-					if currentClose > currentOpen {
-						currentCandleColor = "green"
-					} else {
-						currentCandleColor = "red"
-					}
-
-					previousClose := previous[0]["close"].(float64)
-					previousOpen := previous[0]["open"].(float64)
-					previousCandleColor := ""
-
-					if previousClose > previousOpen {
-						previousCandleColor = "green"
-					} else {
-						previousCandleColor = "red"
-					}
-
-					if trend == "up" {
-						if previousCandleColor == "red" {
-							if currentClose < previousClose {
-								newTrend = "down"
-							} else {
-								newTrend = trend
-							}
-						}
-						if previousCandleColor == "green" {
-							if currentCandleColor == "red" && currentClose < previous[0]["low"].(float64) {
-								newTrend = "down"
-							} else {
-								newTrend = trend
-							}
-						}
-					}
-
-					if trend == "down" {
-						if previousCandleColor == "green" {
-							if currentClose > previousClose {
-								newTrend = "up"
-							} else {
-								newTrend = trend
-							}
-						}
-						if previousCandleColor == "red" {
-							if currentClose > previous[0]["high"].(float64) {
-								newTrend = "up"
-							} else {
-								newTrend = trend
-							}
-						}
-					}
+					new_trend = "up"
 				}
 			}
 		}
-
-		tempObject["daily_trend"] = newTrend
-		tempObject["_id"] = current["_id"]
-		tempObject["openTime_human_readible"] = current["openTime_human_readible"].(string)
-		tempObject["trend"] = current["daily_trend"].(string)
-		finalUpdate = append(finalUpdate, tempObject)
+	} else if current_daily_trend == "down" {
+		if candle_color == "green"{
+			if currentClose > previousClose {
+				new_trend = "up"
+			}
+		}
+		if candle_color == "red"{
+			if currentClose > previousHigh {
+				new_trend = "up"
+			}
+		}
+	}
+	
+	if new_trend == ""{
+		if current_daily_trend == ""{
+			new_trend = "up"
+		} else {
+			new_trend = current_daily_trend
+		}
 	}
 
-	return finalUpdate, nil
+	filters := bson.M{
+		"_id":currentCandle["_id"].(primitive.ObjectID),
+	}
+	update := bson.M{
+		"$set":bson.M{
+			"daily_trend":new_trend,
+		},
+	}
+	err = helpers.UpdateDailyData(filters, update) 
+	//getTrend["_id"] = currentCandle["_id"].(primitive.ObjectID)
+	getTrend["daily_trend"] = 	new_trend
+	//getTrend["openTime_human_readible"] = 	currentCandle["openTime_human_readible"].(string)
+	
+	
+	return getTrend , nil
+	
 }
 
 
