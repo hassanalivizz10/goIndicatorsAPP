@@ -87,13 +87,7 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 			} 
 		}
 		
-		for i := 0; i <= diffInDays; i++ {
-			setStartDate := startDate.AddDate(0, 0, diffInDays) // years, months, days
-			// Set the time components for the start and end dates
-			fromDate = time.Date(setStartDate.Year(), setStartDate.Month(), setStartDate.Day(), 0, 0, 0, 0, time.UTC)
-			toDate = time.Date(setStartDate.Year(), setStartDate.Month(), setStartDate.Day(), 23, 59, 59, 999999999, time.UTC)
 
-		}
 		// dpup indicator
 		dpupDirection, _ := dpupTrendDirectionCalculations(coin, startDate, diffInDays, startOver)
 
