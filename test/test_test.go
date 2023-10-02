@@ -2,51 +2,48 @@ package test
 
 import (
 	"fmt"
-	"time"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"testing"
 )
 
-func MakeRequest() (string, error) {
+func MakeRequest() (interface{}, error) {
 	url := "http://rules.digiebot.com/apiEndPoint/getAllCoinsHavingTradeSettings/1"
-	//url = "http://rules.digiebot.com/goTest"
+	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	token:= "OverLimit#_cgA3s8VSQj"
-		// Set headers to replicate POSTMAN headers
-		req.Header.Add("myToken", token) // Replace with your actual token
-		req.Header.Add("User-Agent", "PostmanRuntime/7.33.0")
-		req.Header.Add("Accept", "*/*")
-		req.Header.Add("Accept-Encoding", "gzip, deflate, br")
-		req.Header.Add("Cache-Control", "no-cache")
-		req.Header.Add("Connection", "keep-alive")
-		req.Header.Add("Host", "localhost:3001") // Replace with your Node.js server's hostname and port
-	//req.Header.Set("Content-Type", "application/json")
-	//req.Header.Set("Authorization", "OverLimit#_ubN7iC5W7D")
-	// Print the request headers for debugging
-	fmt.Println("Request Headers:")
-    fmt.Println(req.Header)
-	// Set a timeout for the request
-	client := &http.Client{Timeout: 10 * time.Second}
+
+	req.Header.Set("postman-token", "54617d62-35b8-4630-25df-7f512d389f6e")
+	req.Header.Set("cache-control", "no-cache")
+	req.Header.Set("mytoken", "OverLimit#_cgA3s8VSQj")
+	req.Header.Set("content-type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	fmt.Println("Response Status Code:", resp.Status)
-fmt.Println("Response Headers:")
-fmt.Println(resp.Header)
+
+	// Check if the status code is 200
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Non-200 status code: %d", resp.StatusCode)
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(body), nil
+	var result interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 func TestHTTPRequest(t *testing.T) {
