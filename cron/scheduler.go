@@ -13,7 +13,7 @@ func StartCronJobs() {
     _, _ = c.AddFunc("@every 20s", controller.RunBigRaiseAndBigDrop)  // every 20seconds
     _, _ = c.AddFunc("@every 20s", controller.BigRaisePullBack) // every 20seconds
     _, _ = c.AddFunc("@every 20s", controller.BigDropPullBack)  // every 20seconds
-    _, _ = c.AddFunc("12 * * * *", controller.StrategyCron)  // every hour 8 minute
+    _, _ = c.AddFunc("0 23 * * *", controller.StrategyCron)  // every hour 8 minute
     _ , _ = c.AddFunc("0 * * * *", controller.RecycleTheTrack)   // every hour start
     // Add more cron jobs here
     c.Start()
