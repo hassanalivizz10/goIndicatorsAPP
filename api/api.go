@@ -5,6 +5,7 @@ import (
 	"time"
 	"sort"
 	"io/ioutil"
+	"reflect"
 	"net/http"
 	"encoding/json"
 	"indicatorsAPP/helpers"
@@ -111,7 +112,8 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 	}
 }
 // POST METHOD to Set Hourly Indicators
-func setHourlyIndicators(c *gin.Context) {
+func SetHourlyIndicatorsHandler(c *gin.Context) {
+	fmt.Println("SetHourlyIndicatorsHandler")
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "indicators#(njVEkn2AEZ" && authHeader != "indicators#CJOMTGzhrB4" {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -130,115 +132,87 @@ func setHourlyIndicators(c *gin.Context) {
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
 		errors = append(errors, "Invalid JSON format")
 	}
-
 	if len(errors) == 0 {
-		//var diffInDays int = 0
 		if coin, ok := requestBody["coin"].(string); !ok || coin == "" {
 			errors = append(errors, "Coin is a required field")
 		}
 		if startDateStr, ok := requestBody["start_date"].(string); !ok || startDateStr == "" {
 			errors = append(errors, "Start Date is a required field")
 		} else {
-			_, err := time.Parse(time.RFC3339, startDateStr)
+			_, err := time.Parse("2006-01-02 15:04:05", startDateStr)
 			if err != nil {
 				errors = append(errors, "Start Date has an invalid format")
 			}
 			if endDateStr, ok := requestBody["end_date"].(string); ok && endDateStr != "" {
-				_, err = time.Parse(time.RFC3339, endDateStr)
+				_, err = time.Parse("2006-01-02 15:04:05", endDateStr)
 				if err != nil {
 					errors = append(errors, "End Date has an invalid format")
 				}
 			}
 		}
-
 		if len(errors) == 0 {
-			where := bson.M{}
-			coin, _ := requestBody["coin"].(string)
-			startDateStr, _ := requestBody["start_date"].(string)
-			endDateStr, _ := requestBody["end_date"].(string)
-
-			startDate, _ := time.Parse(time.RFC3339, startDateStr)
-			where["coin"] = coin
-
-			if startDateStr != "" && endDateStr != "" {
-				endDate, _ := time.Parse(time.RFC3339, endDateStr)
-				where["created_date"] = bson.M{"$gte": startDate, "$lte": endDate}
-			} else {
-				where["created_date"] = bson.M{"$gte": startDate}
+			startDateStr:= requestBody["start_date"].(string)
+			endDateStr := requestBody["end_date"].(string)
+			coin := requestBody["coin"].(string)
+			hourDifference,startDate, err := calculateHourDifference(startDateStr, endDateStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"status":  400,
+					"data":    nil,
+					"error":   errors,
+					"message": "Error On Your Request",
+				})
+				return
 			}
-
 			var resArr []interface{}
-			chartDataFetched, _ :=  helpers.MarketChartDataForCoin(where)
-			dataToParse := []interface{}{chartDataFetched}
-
-			if len(dataToParse) == 0 {
-				resArr = append(resArr, "NO Data Found")
-			} else {
-				settings := dataToParse[0].([]interface{})
-
-				for _, current := range settings {
-					temp := map[string]interface{}{}
-					coinSymbol := coin
-					open := current.(map[string]interface{})["open"].(float64)
-					_id := current.(map[string]interface{})["_id"].(string)
-					//high := current.(map[string]interface{})["high"].(float64)
-					//low := current.(map[string]interface{})["low"].(float64)
-					close := current.(map[string]interface{})["close"].(float64)
-					openTimeHumanReadable := current.(map[string]interface{})["openTime_human_readible"].(string)
-					letDate, _ := time.Parse(time.RFC3339, openTimeHumanReadable)
-					startDateCandle := time.Date(letDate.Year(), letDate.Month(), letDate.Day(), letDate.Hour(), 0, 0, 0, time.UTC)
-					endDateCandle := time.Date(letDate.Year(), letDate.Month(), letDate.Day(), letDate.Hour(), 59, 59, 0, time.UTC)
-
-					DP_UP_of_Candle := CalculateDPUPOfCandle(coinSymbol, startDateCandle, open, close)
-
-					toarr := map[string]interface{}{
-						"DP1":             DP_UP_of_Candle["DP1"],
-						"DP2":             DP_UP_of_Candle["DP2"],
-						"DP3":             DP_UP_of_Candle["DP3"],
-						"UP1":             DP_UP_of_Candle["UP1"],
-						"UP2":             DP_UP_of_Candle["UP2"],
-						"UP3":             DP_UP_of_Candle["UP3"],
-						"startCandleDate": startDateCandle,
-						"endCandleDate":   endDateCandle,
-					}
-
-					DP_UP_of_CandlePerc := CalculateDPUPPercentiles(coinSymbol, toarr, 30)
-
-					temp["_id"] = _id
-					temp["openTime_human_readible"] = openTimeHumanReadable
-					temp["coinsymbol"] = coinSymbol
-					temp["DP_UP_of_Candleperc"] = DP_UP_of_CandlePerc
-					temp["DP_UP_of_Candle"] = DP_UP_of_Candle
-
+			for i := 0; i <= hourDifference; i++ {
+				currentStartDate := startDate.Add(time.Hour * time.Duration(i))
+				currentEndDate := currentStartDate.Add(time.Hour - time.Second)
+				where := bson.M{}
+				where["coin"] = coin
+				where["created_date"] =  bson.M{"$gte": currentStartDate, "$lte": currentEndDate}
+				fmt.Println("where",where)
+				chartDataFetched, err :=  helpers.MarketChartDataForCoin(where)
+				if err!=nil{
+					fmt.Println("Error on MarketChartDataForCoin for Date")
+					fmt.Printf("Hour %d: Start Date: %s, End Date: %s\n", i, currentStartDate.Format("2006-01-02 15:04:05"), currentEndDate.Format("2006-01-02 15:04:05"))
+					continue
+				}
+				if len(chartDataFetched) == 0 {
+					resArr = append(resArr, "NO Data Found")
+					continue
+				} 
+				fmt.Println("chartDataFetched",chartDataFetched)
+				currentData := chartDataFetched[0]
+				open := currentData["open"].(float64)
+				close := currentData["close"].(float64)
+				DP_UP_of_Candle := CalculateDPUPOfCandle(coin,currentStartDate,open,close)
+				toArr := make(map[string]interface{})
+				for key, value := range DP_UP_of_Candle {
+					toArr[key] = value
+				}
+				toArr["startCandleDate"] = currentStartDate
+				toArr["endCandleDate"] = currentEndDate
+				
+				DP_UP_of_Candleperc := CalculateDPUPPercentiles(coin,toArr,30)
+				resArr = append(resArr,DP_UP_of_Candle)
+				resArr = append(resArr,DP_UP_of_Candleperc)
 					
-					//candleTrends := CalculateCandleTrends(coinSymbol, close, startDateCandle, previousDateCandle)
-					//temp["candel_trends"] = candleTrends
-
-					resArr = append(resArr, temp)
-				}
-				var processType int = 0
-				ProcessFinalData(resArr, processType)
-				var candelTrends interface{}
-				if coin == "BTCUSDT" {
-					processType = 1
-					ProcessFinalData(resArr, processType)
-				}
-
-				//candelTrends := processCandelTrends(coin, startDateStr, totalHours, 0)
+				fmt.Println("open",open,"close",close)
+			}
 
 				c.JSON(http.StatusOK, gin.H{
 					"status": 200,
 					"data":   requestBody,
 					"response": map[string]interface{}{
 						"dpup":        resArr,
-						"candel_trends": candelTrends,
+						"candel_trends": nil,
 					},
 					"error":   nil,
 					"message": "Successfully Done",
 				})
 				return
-			}
-		} else {
+		} else {   // inner if errors
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  400,
 				"data":    nil,
@@ -247,17 +221,42 @@ func setHourlyIndicators(c *gin.Context) {
 			})
 			return
 		}
-	}
-
-	c.JSON(http.StatusBadRequest, gin.H{
-		"status":  400,
-		"data":    nil,
-		"error":   "Params Missing",
-		"message": "Error On Your Request",
-	})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  400,
+			"data":    nil,
+			"error":   errors,
+			"message": "Error On Your Request",
+		})
+		return
+	} // ends outer if no errors
 }
 
 
+func calculateHourDifference(startDateString, endDateString string) (int,time.Time, error) {
+	// Define the date and time layout
+	layout := "2006-01-02 15:04:05"
+
+	// Parse start_date and end_date
+	startDate, err := time.Parse(layout, startDateString)
+	if err != nil {
+		return 0,time.Time{}, err
+	}
+
+	endDate, err := time.Parse(layout, endDateString)
+	if err != nil {
+		return 0,time.Time{}, err
+	}
+
+	// Set both dates to the start and end of the respective hours
+	startDate = startDate.Truncate(time.Hour)
+	endDate = endDate.Truncate(time.Hour).Add(time.Hour - time.Second)
+
+	// Calculate the hour difference
+	hourDifference := int(endDate.Sub(startDate).Hours())
+
+	return hourDifference,startDate, nil
+}
 
 func CalculateDPUPOfCandle(coin string, date time.Time, open, close float64) map[string]float64 {
 	lastCandle2 , _ := helpers.GetLastCandle(coin, date, 2)
@@ -356,7 +355,15 @@ func getDPUPPercentiles(arr []float64, index string) map[string]float64 {
 
 	return objToReturn
 }
+// Helper function to check if a field name is DP field
+func isDPField(fieldName string) bool {
+	return len(fieldName) >= 2 && fieldName[:2] == "DP"
+}
 
+// Helper function to check if a field name is UP field
+func isUPField(fieldName string) bool {
+	return len(fieldName) >= 2 && fieldName[:2] == "UP"
+}
 func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duration int) map[string]string {
 	finalArr := make(map[string]string)
 	DP1Now := toArr["DP1"].(float64)
@@ -372,13 +379,67 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 		fmt.Println("calculateDPUPPercentiles: NO response")
 		return nil
 	}
+	fmt.Println("response",response[0])
+	dpFields := make(map[string][]float64)
+	upFields := make(map[string][]float64)
+	firstEntry := response[0]
+	dp1 := firstEntry["DP1"].(primitive.A)
+	dp2 := firstEntry["DP2"].(primitive.A)
+	dp3 := firstEntry["DP3"].(primitive.A)
 
-	DP1 := response[0]["DP1"].([]float64)
-	DP2 := response[0]["DP2"].([]float64)
-	DP3 := response[0]["DP3"].([]float64)
-	UP1 := response[0]["UP1"].([]float64)
-	UP2 := response[0]["UP2"].([]float64)
-	UP3 := response[0]["UP3"].([]float64)
+	up1 := firstEntry["UP1"].(primitive.A)
+	up2 := firstEntry["UP2"].(primitive.A)
+	up3 := firstEntry["UP3"].(primitive.A)
+	
+	fmt.Println("dp1",dp1)
+	fmt.Println("dp2",dp2)
+	fmt.Println("dp3",dp3)
+	fmt.Println("up1",up1)
+	fmt.Println("up2",up2)
+	fmt.Println("up3",up3)
+	// Iterate through the fields of the first map entry
+	for fieldName, fieldValue := range firstEntry {
+		var parsed []float64
+		if dpSlice, ok := fieldValue.(primitive.A); ok {
+			if isDPField(fieldName) {
+				for _, element := range dpSlice {
+					fmt.Println("field",fieldName)
+					fmt.Println("element",reflect.TypeOf(element))
+					value ,ok := helpers.ToFloat64(element)
+					if ok{
+						parsed = append(parsed, value)
+					}
+				}
+				dpFields[fieldName] = parsed
+			}
+			if isUPField(fieldName) {
+				for _, element := range dpSlice {
+					value ,ok := helpers.ToFloat64(element)
+					if ok{
+						parsed = append(parsed, value)
+					}
+		
+				}
+				upFields[fieldName] = parsed
+			}
+		}
+	}
+
+	// Now you have maps dpFields and upFields containing values for DP and UP fields
+	// Print the values
+	fmt.Println("DP Fields:")
+	fmt.Println(dpFields)
+
+	fmt.Println("UP Fields:")
+	fmt.Println(upFields)
+
+	
+	DP1 :=dpFields["DP1"]
+	DP2 :=dpFields["DP2"]
+	DP3 :=dpFields["DP3"]
+	UP1 :=upFields["UP1"]
+	UP2 :=upFields["UP2"]
+	UP3 :=upFields["UP3"]
 
 	DP1 = filterNonZero(DP1)
 	DP2 = filterNonZero(DP2)

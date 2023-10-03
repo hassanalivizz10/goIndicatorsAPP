@@ -12,6 +12,7 @@ func SetupRouter() *gin.Engine {
 
     // Define API routes and attach handlers
     router.POST("/createUpdateDailyIndicators",api.CreateUpdateDailyIndicatorsHandler)
+    router.POST("/SetHourlyIndicatorsHandler",api.SetHourlyIndicatorsHandler)
     // router.GET("/api/resource", handler.GetResource)
     // Add more routes here
 

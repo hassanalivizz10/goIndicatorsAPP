@@ -11,7 +11,25 @@ import(
 
 func MarketChartDataForCoin(filters bson.M) ([]bson.M, error){
 	collectionName := "market_chart"
-	projection := bson.M{}
+	projection := bson.M{
+		"created_date":            1,
+			//"dpup_trend_direction":    1,
+			//"UP1_perc":                1,
+			//"UP2_perc":                1,
+			//"UP3_perc":                1,
+			//"DP1_perc":                1,
+			//"DP2_perc":                1,
+			//"DP3_perc":                1,
+			"open":                    1,
+			//"daily_trend":             1,
+			"coin":                    1,
+			"low":                     1,
+			"high":                    1,
+			"candle_color":            1,
+			"close":                   1,
+			"openTime_human_readible": 1,
+			"closeTime_human_readible": 1,
+	}
 	var limit int64 = 0
 	var sortOrder int  = 0
 	sortBy := ""
