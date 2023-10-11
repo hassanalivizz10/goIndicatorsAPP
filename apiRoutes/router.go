@@ -1,28 +1,25 @@
 package apiroutes
 
 import (
-
-  
-    "github.com/gin-gonic/gin"
-    "indicatorsAPP/api"
+	"github.com/gin-gonic/gin"
+	"indicatorsAPP/api"
 )
 
 func SetupRouter() *gin.Engine {
-    router := gin.Default()
+	router := gin.Default()
 
-    // Define API routes and attach handlers
-    router.POST("/createUpdateDailyIndicators",api.CreateUpdateDailyIndicatorsHandler)
-    router.POST("/setHourlyIndicators",api.SetHourlyIndicatorsHandler)
-    // router.GET("/api/resource", handler.GetResource)
-    // Add more routes here
+	// Define API routes and attach handlers
+	router.POST("/createUpdateDailyIndicators", api.CreateUpdateDailyIndicatorsHandler)
+	router.POST("/setHourlyIndicators", api.SetHourlyIndicatorsHandler)
+	outer.POST("/fetchTradingDataByCoin", api.fetchTradingDataByCoinHandler)
+	// router.GET("/api/resource", handler.GetResource)
+	// Add more routes here
 
-    return router
+	return router
 }
 
 func StartServer() {
-    router := SetupRouter()
-    // Configure server settings (e.g., port)
-    router.Run(":3300")
+	router := SetupRouter()
+	// Configure server settings (e.g., port)
+	router.Run(":3300")
 }
-
-
