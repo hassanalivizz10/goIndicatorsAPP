@@ -5,7 +5,7 @@ import (
 	"time"
 	"sort"
 	"io/ioutil"
-	"reflect"
+	//"reflect"
 	"net/http"
 	"encoding/json"
 	"indicatorsAPP/helpers"
@@ -14,6 +14,12 @@ import (
 	 "go.mongodb.org/mongo-driver/bson"
 	 "go.mongodb.org/mongo-driver/bson/primitive"
 )
+var customLayout string
+
+
+func init(){
+	customLayout = "2006-01-02 15:04:05"
+}
 // POST METHOD to Calculate Daily Indicators
 func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
@@ -50,7 +56,7 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 		if coin := jsonData["coin"].(string); coin == "" {
 			errors = append(errors, "Coin is Required Field")
 		}
-		customLayout := "2006-01-02 15:04:05"
+		
 		startDateStr := jsonData["start_date"].(string)  //c.Query("start_date")
 		startDate, err := time.Parse(customLayout, startDateStr)
 		if err != nil {
@@ -165,6 +171,7 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 				return
 			}
 			var resArr []interface{}
+			var candel_trends[]bson.M
 			for i := 0; i <= hourDifference; i++ {
 				currentStartDate := startDate.Add(time.Hour * time.Duration(i))
 				currentEndDate := currentStartDate.Add(time.Hour - time.Second)
@@ -178,6 +185,7 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 					fmt.Printf("Hour %d: Start Date: %s, End Date: %s\n", i, currentStartDate.Format("2006-01-02 15:04:05"), currentEndDate.Format("2006-01-02 15:04:05"))
 					continue
 				}
+				fmt.Println("chartDataFetched",chartDataFetched)
 				if len(chartDataFetched) == 0 {
 					resArr = append(resArr, "NO Data Found")
 					continue
@@ -193,10 +201,16 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 				}
 				toArr["startCandleDate"] = currentStartDate
 				toArr["endCandleDate"] = currentEndDate
-				
-				DP_UP_of_Candleperc := CalculateDPUPPercentiles(coin,toArr,30)
+				temp := map[string]interface{}{
+					
+					"openTime_human_readible":currentData["openTime_human_readible"].(string),
+				}
+				resArr = append(resArr,temp)
+				//DP_UP_of_Candleperc := CalculateDPUPPercentiles(coin,toArr,30)
+				candel_trends = processCandelTrends(coin,currentStartDate,open,close)
+				fmt.Println("candel_trends",candel_trends)
 				resArr = append(resArr,DP_UP_of_Candle)
-				resArr = append(resArr,DP_UP_of_Candleperc)
+				//resArr = append(resArr,DP_UP_of_Candleperc)
 					
 				fmt.Println("open",open,"close",close)
 			}
@@ -206,7 +220,7 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 					"data":   requestBody,
 					"response": map[string]interface{}{
 						"dpup":        resArr,
-						"candel_trends": nil,
+						"candel_trends": candel_trends,
 					},
 					"error":   nil,
 					"message": "Successfully Done",
@@ -259,6 +273,7 @@ func calculateHourDifference(startDateString, endDateString string) (int,time.Ti
 }
 
 func CalculateDPUPOfCandle(coin string, date time.Time, open, close float64) map[string]float64 {
+	// 0.0000782 ,   0.0000778 , 
 	lastCandle2 , _ := helpers.GetLastCandle(coin, date, 2)
 	lastCandle3 , _ := helpers.GetLastCandle(coin, date, 3)
 	lastCandle5 , _ := helpers.GetLastCandle(coin, date, 5)
@@ -334,7 +349,7 @@ func CalculateDPUPOfCandle(coin string, date time.Time, open, close float64) map
 	returnData["UP1"] = abs(UP1)
 	returnData["UP2"] = abs(UP2)
 	returnData["UP3"] = abs(UP3)
-
+	//fmt.Println("returnData",returnData)
 	return returnData
 }
 
@@ -352,7 +367,10 @@ func getDPUPPercentiles(arr []float64, index string) map[string]float64 {
 		indexName := fmt.Sprintf("%s_%d", index, val)
 		objToReturn[indexName] = valueToAssign
 	}
-
+	if index == "DP1"{
+		fmt.Println("get_DP_UP_percentiles for index : "+index,objToReturn)
+	}
+	
 	return objToReturn
 }
 // Helper function to check if a field name is DP field
@@ -379,32 +397,26 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 		fmt.Println("calculateDPUPPercentiles: NO response")
 		return nil
 	}
-	fmt.Println("response",response[0])
+	//fmt.Println("response",response)
 	dpFields := make(map[string][]float64)
 	upFields := make(map[string][]float64)
 	firstEntry := response[0]
-	dp1 := firstEntry["DP1"].(primitive.A)
-	dp2 := firstEntry["DP2"].(primitive.A)
-	dp3 := firstEntry["DP3"].(primitive.A)
 
-	up1 := firstEntry["UP1"].(primitive.A)
-	up2 := firstEntry["UP2"].(primitive.A)
-	up3 := firstEntry["UP3"].(primitive.A)
 	
-	fmt.Println("dp1",dp1)
-	fmt.Println("dp2",dp2)
-	fmt.Println("dp3",dp3)
-	fmt.Println("up1",up1)
-	fmt.Println("up2",up2)
-	fmt.Println("up3",up3)
+	//fmt.Println("dp1",dp1)
+	// fmt.Println("dp2",dp2)
+	// fmt.Println("dp3",dp3)
+	// fmt.Println("up1",up1)
+	// fmt.Println("up2",up2)
+	// fmt.Println("up3",up3)
 	// Iterate through the fields of the first map entry
 	for fieldName, fieldValue := range firstEntry {
 		var parsed []float64
 		if dpSlice, ok := fieldValue.(primitive.A); ok {
 			if isDPField(fieldName) {
 				for _, element := range dpSlice {
-					fmt.Println("field",fieldName)
-					fmt.Println("element",reflect.TypeOf(element))
+					//fmt.Println("field",fieldName)
+					//fmt.Println("element",reflect.TypeOf(element))
 					value ,ok := helpers.ToFloat64(element)
 					if ok{
 						parsed = append(parsed, value)
@@ -427,11 +439,11 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 
 	// Now you have maps dpFields and upFields containing values for DP and UP fields
 	// Print the values
-	fmt.Println("DP Fields:")
-	fmt.Println(dpFields)
+	// fmt.Println("DP Fields:")
+	// fmt.Println(dpFields)
 
-	fmt.Println("UP Fields:")
-	fmt.Println(upFields)
+	// fmt.Println("UP Fields:")
+	// fmt.Println(upFields)
 
 	
 	DP1 :=dpFields["DP1"]
@@ -440,6 +452,15 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 	UP1 :=upFields["UP1"]
 	UP2 :=upFields["UP2"]
 	UP3 :=upFields["UP3"]
+	// fmt.Println(".==================================================== Before Filters .====================================================")
+	// fmt.Println("DP1",DP1)
+	// // fmt.Println("DP2",DP2)
+	// // fmt.Println("DP3",DP3)
+	// // fmt.Println("UP1",UP1)
+	// // fmt.Println("UP2",UP2)
+	// // fmt.Println("UP3",UP3)
+	// fmt.Println(".==================================================== Before Filters Ends .====================================================")
+	
 
 	DP1 = filterNonZero(DP1)
 	DP2 = filterNonZero(DP2)
@@ -449,13 +470,36 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 	UP3 = filterNonZero(UP3)
 
 
-	sort.Float64s(DP1)
-	sort.Float64s(DP2)
-	sort.Float64s(DP3)
-	sort.Float64s(UP1)
-	sort.Float64s(DP1)
-	sort.Float64s(UP2)
-	sort.Float64s(UP3)
+	// fmt.Println(".==================================================== After Filters .====================================================")
+	// fmt.Println("DP1",DP1)
+	// // fmt.Println("DP2",DP2)
+	// // fmt.Println("DP3",DP3)
+	// // fmt.Println("UP1",UP1)
+	// // fmt.Println("UP2",UP2)
+	// // fmt.Println("UP3",UP3)
+	// fmt.Println(".==================================================== After Filters Ends .====================================================")
+	
+	DPSortSliceDescending(DP1)
+	DPSortSliceDescending(DP2)
+	DPSortSliceDescending(DP3)
+	DPSortSliceDescending(UP1)
+	DPSortSliceDescending(UP2)
+	DPSortSliceDescending(UP3)
+	
+
+
+
+
+	
+	//fmt.Println(".==================================================== After Sort .====================================================")
+	//fmt.Println("DP1",DP1)
+	// fmt.Println("DP2",DP2)
+	// fmt.Println("DP3",DP3)
+	// fmt.Println("UP1",UP1)
+	// fmt.Println("UP2",UP2)
+	// fmt.Println("UP3",UP3)
+	//fmt.Println(".==================================================== After Sort Ends .====================================================")
+
 
 	DP1Per := getDPUPPercentiles(DP1, "DP1")
 	DP2Per := getDPUPPercentiles(DP2, "DP2")
@@ -477,7 +521,7 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 	finalArr["UP1"] = currUP1
 	finalArr["UP2"] = currUP2
 	finalArr["UP3"] = currUP3
-
+	fmt.Println("calculate_DP_UP_percentiles final_arr",finalArr);
 	return finalArr
 }
 
@@ -491,7 +535,7 @@ func getVolumeInDPUPPercentiles(percentileArr map[string]float64, quantity float
 		getPercentile := percentileArr[check+"_"+val]
 		percentile[val] = getPercentile
 	}
-
+	//fmt.Println("get_volume_in_DP_UP_percentiles for : "+check,percentile)
 	LastQtyTimeAgo := "0"
 
 	if quantity >= percentile["100"] && quantity <= percentile["75"] {
@@ -519,7 +563,7 @@ func getVolumeInDPUPPercentiles(percentileArr map[string]float64, quantity float
 	} else if quantity >= percentile["1"] {
 		LastQtyTimeAgo = "1"
 	}
-
+	//fmt.Println("get_volume_in_DP_UP_percentiles LastQtyTimeAgo :"+check,LastQtyTimeAgo)
 	return LastQtyTimeAgo
 }
 
@@ -540,158 +584,110 @@ func filterNonZero(arr []float64) []float64 {
 	return filtered
 }
 
-func processCandelTrends(coin string, date1 time.Time, totalHours int, startOver int) []bson.M{
-	var final []bson.M
-	var	res []bson.M
-	//lastTrend := map[string]string{}
-
-	for i := 0; i < totalHours; i++ {
-		//trendValueGot := map[string]string{}
-		//newTrendValue := ""
-		//lastTrendValue := ""
-		makeDate := date1.Add(time.Duration(i) * time.Hour)
-		date := makeDate.Truncate(time.Hour)
-		currentData, err := helpers.GetLastCandle(coin, date, 0) // last candle by coin, date, and third param subtraction of given num
-		//lastDateToGet := date.Add(-1 * time.Hour)
-
-		if len(currentData) == 0 || err!=nil {
-			continue
-		}
-
-		
-		for _, data := range currentData {
-			final = append(final, data)
-		}
-	}
-
-	if len(final) == 0 {
-		return []bson.M{}
-	}
-
-	
-	counter := 0
-
-	for index := 0; index < len(final); index++ {
-		counter++
-		dataToUpDate := final[index]
-		var current map[string]interface{}
-		for _, value := range dataToUpDate {
-			if v, ok := value.(map[string]interface{}); ok {
-				current = v
-				break // Exit the loop after finding the first map
-			}
-		}
-		newTrendValue := ""
-		temp333 := map[string]interface{}{}
-		currentOpen := current["openTime_human_readible"].(string)
-		fmt.Println("currentOpen", currentOpen)
-		temp333["currentOpen"] = currentOpen
-
-		if counter == 1 && startOver == 1 {
-			temp333["lastdatetime"] = nil
-			temp333["last_candel_trends"] = nil
-			temp333["date"] = nil
-			newTrendValue = "up"
-		} else {
-
-			makeDate, err := time.Parse(time.RFC3339, currentOpen)
-			if err != nil {
-				continue
-			}
-			date := time.Date(makeDate.Year(), makeDate.Month(), makeDate.Day(), makeDate.Hour(), makeDate.Minute(), makeDate.Second(), 0, time.UTC)
-			dateToGet := time.Date(makeDate.Year(), makeDate.Month(), makeDate.Day(), makeDate.Hour()-1, makeDate.Minute(), makeDate.Second(), 0, time.UTC)
-			temp333["date"] = date
-			temp333["makeDate"] = makeDate
-			lastData, _ := helpers.LastCandelTrends(coin, current["created_date"].(time.Time), "candel_trends")
-			fmt.Println("lastData", lastData, date)
-			lastTrendValue := lastData[0]["candel_trends"].(string)
-			temp333["last_candel_trends"] = lastTrendValue
-			temp333["dsds"] = lastData[0]["_id"].(string)
-
-			switch lastTrendValue {
-			case "up":
-				trendValueGot := calculateNewTrend("up", coin, dateToGet, current)
-				fmt.Println("trend_value_got", trendValueGot)
-				if len(trendValueGot) > 0 {
-					if trendValueGot["new_trend"].(string) != "" {
-						newTrendValue = trendValueGot["new_trend"].(string)
-					} else {
-						newTrendValue = lastTrendValue
-					}
-				} else {
-					newTrendValue = lastTrendValue
-				}
-			case "strong_up":
-				trendValueGot := calculateNewTrend("strong_up", coin, dateToGet, current)
-				if len(trendValueGot) > 0 {
-					if trendValueGot["new_trend"].(string) != "" {
-						newTrendValue = trendValueGot["new_trend"].(string)
-					} else {
-						newTrendValue = lastTrendValue
-					}
-				} else {
-					newTrendValue = lastTrendValue
-				}
-			case "down":
-				trendValueGot := calculateNewTrend("down", coin, dateToGet, current)
-				if len(trendValueGot) > 0 {
-					if trendValueGot["new_trend"].(string) != "" {
-						newTrendValue = trendValueGot["new_trend"].(string)
-					} else {
-						newTrendValue = lastTrendValue
-					}
-				} else {
-					newTrendValue = lastTrendValue
-				}
-			case "strong_down":
-				trendValueGot := calculateNewTrend("strong_down", coin, dateToGet, current)
-				if len(trendValueGot) > 0 {
-					if trendValueGot["new_trend"].(string) != "" {
-						newTrendValue = trendValueGot["new_trend"].(string)
-					} else {
-						newTrendValue = lastTrendValue
-					}
-				} else {
-					newTrendValue = lastTrendValue
-				}
-			default:
-				newTrendValue = lastTrendValue
-			}
-		}
-
-		//idToUpdate := current["_id"].(string)
-		//candelTrends := newTrendValue
-		temp333["candel_trends"] = newTrendValue
-
-		//updateCandelTrends(candelTrends, idToUpdate)
-		res = append(res, temp333)
-	}
-
-	return res
+// DPs SortSliceDescending sorts a slice of integers in descending order.
+func DPSortSliceDescending(slice []float64) {
+    sort.Slice(slice, func(i, j int) bool {
+        return slice[i] > slice[j]
+    })
 }
 
-func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, currentData map[string]interface{}) map[string]interface{} {
+func processCandelTrends(coin string, dateToGet time.Time, open, close float64) []bson.M{
+	lastTrend ,err := helpers.LastCandelTrends(coin,dateToGet,"candel_trends")
+	if err!=nil{
+		return []bson.M{}
+	}
+	
+	var lastTrendValue string = "up"
+	if len(lastTrend) > 0{
+		lastTrendValue = lastTrend[0]["candel_trends"].(string)
+		//fmt.Println("lastTrend",lastTrend)
+	}
+	var newTrendValue string
+	fmt.Println("lastTrendValue",lastTrendValue)
+	switch lastTrendValue {
+	case "up":
+		trendValueGot := calculateNewTrend("up", coin, dateToGet, close)
+		fmt.Println("trend_value_got", trendValueGot)
+		if len(trendValueGot) > 0 {
+			if trendValueGot["new_trend"].(string) != "" {
+				newTrendValue = trendValueGot["new_trend"].(string)
+			} else {
+				newTrendValue = lastTrendValue
+			}
+		} else {
+			newTrendValue = lastTrendValue
+		}
+	case "strong_up":
+		trendValueGot := calculateNewTrend("strong_up", coin, dateToGet, close)
+		if len(trendValueGot) > 0 {
+			if trendValueGot["new_trend"].(string) != "" {
+				newTrendValue = trendValueGot["new_trend"].(string)
+			} else {
+				newTrendValue = lastTrendValue
+			}
+		} else {
+			newTrendValue = lastTrendValue
+		}
+	case "down":
+		trendValueGot := calculateNewTrend("down", coin, dateToGet, close)
+		if len(trendValueGot) > 0 {
+			if trendValueGot["new_trend"].(string) != "" {
+				newTrendValue = trendValueGot["new_trend"].(string)
+			} else {
+				newTrendValue = lastTrendValue
+			}
+		} else {
+			newTrendValue = lastTrendValue
+		}
+	case "strong_down":
+		trendValueGot := calculateNewTrend("strong_down", coin, dateToGet, close)
+		if len(trendValueGot) > 0 {
+			if trendValueGot["new_trend"].(string) != "" {
+				newTrendValue = trendValueGot["new_trend"].(string)
+			} else {
+				newTrendValue = lastTrendValue
+			}
+		} else {
+			newTrendValue = lastTrendValue
+		}
+	default:
+		newTrendValue = lastTrendValue
+	}
+	data := []bson.M{
+		{"candel_trends":newTrendValue,"last_candel_trends":lastTrendValue},
+	}
+	return data
+
+}
+
+func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, close float64) map[string]interface{} {
 	finalTemp := map[string]interface{}{}
-	finalTemp["currentClose"] = currentData["close"].(float64)
+	finalTemp["currentClose"] = close
 	newTrendValue := ""
 	closestHH := 0
+
 	if lastTrendValue == "up" || lastTrendValue == "strong_up" {
 		
 		if lastTrendValue == "up" {
-			lastHH, _ := helpers.GetHHSwingStatusFromCandleChart(coin, dateToGet)
-			lastLH, _ := helpers.GetLHSwingStatusFromCandleChart(coin, dateToGet)
-
+			lastHH, lastHHerr:= helpers.GetHHSwingStatusFromCandleChart(coin, dateToGet)
+			if lastHHerr !=nil{
+				fmt.Println("ERROR ON lastHHerr",lastHHerr.Error())
+			}
+			lastLH,  lastLHerr:= helpers.GetLHSwingStatusFromCandleChart(coin, dateToGet)
+			if lastLHerr !=nil{
+				fmt.Println("ERROR ON lastHHerr",lastLHerr.Error())
+			}
 			if len(lastHH) > 0 {
 				if len(lastLH) > 0 {
 					hhOpenTimeHumanReadable := lastHH[0]["openTime_human_readible"].(string)
 					lhOpenTimeHumanReadable := lastLH[0]["openTime_human_readible"].(string)
 			
-					hhTime, err := time.Parse(time.RFC3339, hhOpenTimeHumanReadable)
+					hhTime, err := time.Parse(customLayout, hhOpenTimeHumanReadable)
 					if err != nil {
 						// Handle parsing error
 						fmt.Printf("Error parsing hhOpenTimeHumanReadable: %v\n", err)
 					} else {
-						lhTime, err := time.Parse(time.RFC3339, lhOpenTimeHumanReadable)
+						lhTime, err := time.Parse(customLayout, lhOpenTimeHumanReadable)
 						if err != nil { 
 							// Handle parsing error
 							fmt.Printf("Error parsing lhOpenTimeHumanReadable: %v\n", err)
@@ -705,15 +701,21 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 
 				finalTemp["highest_swing_point"] = lastHH[0]["highest_swing_point"].(float64)
 
-				if currentData["close"].(float64) > lastHH[0]["highest_swing_point"].(float64) {
+				if close > lastHH[0]["highest_swing_point"].(float64) {
 					newTrendValue = "strong_up"
 				}
 			}
 		}
 
 		if newTrendValue != "strong_up" {
-			lastLL, _ := helpers.GetLLSwingStatusFromCandleChart(coin, dateToGet)
-			lastHL, _ := helpers.GetHLSwingStatusFromCandleChart(coin, dateToGet)
+			lastLL, lastLLerr := helpers.GetLLSwingStatusFromCandleChart(coin, dateToGet)
+			if lastLLerr!=nil{
+				fmt.Println("ERROR ON lastHHerr",lastLLerr.Error())
+			}
+			lastHL, lastHLerr := helpers.GetHLSwingStatusFromCandleChart(coin, dateToGet)
+			if lastHLerr!=nil{
+				fmt.Println("ERROR ON lastHHerr",lastHLerr.Error())
+			}
 			closestLL := 0
 
 			if len(lastLL) > 0 {
@@ -721,12 +723,12 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 
 				if len(lastHL) > 0 {
 					hlOpenTimeHumanReadable := lastHL[0]["openTime_human_readible"].(string)
-					llTime, err := time.Parse(time.RFC3339, llOpenTimeHumanReadable)
+					llTime, err := time.Parse(customLayout ,llOpenTimeHumanReadable)
 					if err != nil {
 						// Handle parsing error
 						fmt.Printf("Error parsing llOpenTimeHumanReadable: %v\n", err)
 					} else {
-						hlTime, err := time.Parse(time.RFC3339, hlOpenTimeHumanReadable)
+						hlTime, err := time.Parse(customLayout, hlOpenTimeHumanReadable)
 						if err != nil { 
 							// Handle parsing error
 							fmt.Printf("Error parsing hlOpenTimeHumanReadable: %v\n", err)
@@ -744,10 +746,10 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 					// 	closestLL = 1
 					// }
 				}
+				lowest_swing_point , _ :=   helpers.ToFloat64(lastLL[0]["lowest_swing_point"])
+				finalTemp["lowest_swing_point"] = lowest_swing_point
 
-				finalTemp["lowest_swing_point"] = lastLL[0]["lowest_swing_point"].(float64)
-
-				if currentData["close"].(float64) < lastLL[0]["lowest_swing_point"].(float64) {
+				if close <  lowest_swing_point {
 					newTrendValue = "strong_down"
 				}
 			}
@@ -755,9 +757,11 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 			finalTemp["closestLL"] = closestLL
 
 			if len(lastHL) > 0 && newTrendValue != "strong_down" && closestLL == 0 {
-				finalTemp["lowest_swing_point_latest"] = lastHL[0]["lowest_swing_point"].(float64)
 
-				if currentData["close"].(float64) < lastHL[0]["lowest_swing_point"].(float64) {
+				lowest_swing_point , _ :=   helpers.ToFloat64(lastHL[0]["lowest_swing_point"])
+				finalTemp["lowest_swing_point_latest"] = lowest_swing_point
+
+				if close < lowest_swing_point {
 					newTrendValue = "down"
 				}
 			}
@@ -766,13 +770,18 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 
 	if lastTrendValue == "down" || lastTrendValue == "strong_down" {
 		if lastTrendValue == "down" {
-			lastLL, _ := helpers.GetLLSwingStatusFromCandleChart(coin, dateToGet)
+			lastLL, lastLLerr := helpers.GetLLSwingStatusFromCandleChart(coin, dateToGet)
+
+			if lastLLerr!=nil{
+				fmt.Println("ERROR ON lastHHerr",lastLLerr.Error())
+			}
 			//lastHL, _ := helpers.GetHLSwingStatusFromCandleChart(coin, dateToGet)
 
 			if len(lastLL) > 0 {
-				finalTemp["lowest_swing_point"] = lastLL[0]["lowest_swing_point"].(float64)
+				lowest_swing_point , _ :=   helpers.ToFloat64(lastLL[0]["lowest_swing_point"])
+				finalTemp["lowest_swing_point"] = lowest_swing_point
 
-				if currentData["close"].(float64) < lastLL[0]["lowest_swing_point"].(float64) {
+				if close < lowest_swing_point {
 					newTrendValue = "strong_down"
 				}
 			}
@@ -780,20 +789,27 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 
 		if newTrendValue != "strong_down" {
 			
-			lastHH, _ := helpers.GetHHSwingStatusFromCandleChart(coin, dateToGet)
-			lastLH, _ := helpers.GetLHSwingStatusFromCandleChart(coin, dateToGet)
+			lastHH, lastHHerr := helpers.GetHHSwingStatusFromCandleChart(coin, dateToGet)
+			if lastHHerr!=nil{
+				fmt.Println("ERROR ON lastHHerr",lastHHerr.Error())
+			}
 
+			lastLH, lastLHerr := helpers.GetLHSwingStatusFromCandleChart(coin, dateToGet)
+
+			if lastLHerr!=nil{
+				fmt.Println("ERROR ON lastHHerr",lastLHerr.Error())
+			}
 			if len(lastHH) > 0 {
 				hhOpenTimeHumanReadable := lastHH[0]["openTime_human_readible"].(string)
 
 				if len(lastLH) > 0 {
 					lhOpenTimeHumanReadable := lastLH[0]["openTime_human_readible"].(string)
-					hhTime, err := time.Parse(time.RFC3339, hhOpenTimeHumanReadable)
+					hhTime, err := time.Parse(customLayout, hhOpenTimeHumanReadable)
 					if err != nil {
 						// Handle parsing error
 						fmt.Printf("Error parsing hhOpenTimeHumanReadable: %v\n", err)
 					} else {
-						lhTime, err := time.Parse(time.RFC3339, lhOpenTimeHumanReadable)
+						lhTime, err := time.Parse(customLayout, lhOpenTimeHumanReadable)
 						if err != nil { 
 							// Handle parsing error
 							fmt.Printf("Error parsing lhOpenTimeHumanReadable: %v\n", err)
@@ -806,9 +822,11 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 					
 				}
 
-				finalTemp["highest_swing_point"] = lastHH[0]["highest_swing_point"].(float64)
+				highest_swing_point , _ :=   helpers.ToFloat64(lastHH[0]["highest_swing_point"])
 
-				if currentData["close"].(float64) > lastHH[0]["highest_swing_point"].(float64) {
+				finalTemp["highest_swing_point"] = highest_swing_point
+
+				if close > highest_swing_point {
 					newTrendValue = "strong_up"
 				}
 			}
@@ -816,9 +834,10 @@ func calculateNewTrend(lastTrendValue string, coin string, dateToGet time.Time, 
 			finalTemp["closestHH"] = closestHH
 
 			if len(lastLH) > 0 && newTrendValue != "strong_up" && closestHH == 0 {
-				finalTemp["highest_swing_point_latest"] = lastLH[0]["highest_swing_point"].(float64)
+				highest_swing_point , _ :=   helpers.ToFloat64(lastLH[0]["highest_swing_point"])
+				finalTemp["highest_swing_point_latest"] = highest_swing_point
 
-				if currentData["close"].(float64) > lastLH[0]["highest_swing_point"].(float64) {
+				if close > highest_swing_point {
 					newTrendValue = "up"
 				}
 			}

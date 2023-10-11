@@ -42,10 +42,11 @@ func MarketChartDataForCoin(filters bson.M) ([]bson.M, error){
 
 func GetLastCandle(coin string,timestamp time.Time,durationLimit int) ([]bson.M, error){
 	// filters processing
-	duration := time.Duration(durationLimit) * time.Hour
-	newDate := time.Now().UTC()
-	startDate := newDate.Add(-duration)
-	endDate := newDate
+	//duration := time.Duration(durationLimit) * time.Hour
+	newDate := timestamp
+	
+	startDate := time.Date(newDate.Year(), newDate.Month(), newDate.Day(), newDate.Hour()-durationLimit, 0, 0, 0, time.UTC)
+    endDate := time.Date(newDate.Year(), newDate.Month(), newDate.Day(), newDate.Hour()-durationLimit, 59, 59, 0, time.UTC)
 	
 
 	// filters
@@ -72,15 +73,15 @@ func DPUPPercentileData(coin string, toArr map[string]interface{}, duration int)
 	startCandleDate := toArr["startCandleDate"].(time.Time)
 	endCandleDate := toArr["endCandleDate"].(time.Time)
 	
-	
-	duration *= -1
+	// 30 Days back so multiple by 24 , duration is 30 , 
+	duration *= -24
 	startDate := startCandleDate.Add(time.Duration(duration) * time.Hour)
-	
+	endDate :=  endCandleDate
 	match := bson.M{
 		"coin":        coin,
-		"created_date": bson.M{"$gte": startDate, "$lte": endCandleDate},
+		"created_date": bson.M{"$gte": startDate, "$lte": endDate},
 	}
-
+	//fmt.Println("match",match)
 	pipeline := []bson.M{
 		{"$match": match},
 		{"$sort": bson.M{"coin": 1}},
@@ -241,11 +242,12 @@ func GetHHSwingStatusFromCandleChart(coin string,date time.Time) ([]bson.M, erro
 		"openTime_human_readible"    :    1,
 		"closeTime_human_readible"   :    1,
 	}
-	var limit int64    = 0
+	var limit int64    = 1
 	var sortOrder int  = -1
 	sortBy             := "created_date"
 	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
 	if err!=nil{
+		fmt.Println("err",err)
 		return []bson.M{} , err
 	}
 	return docs , nil
@@ -265,7 +267,7 @@ func GetLHSwingStatusFromCandleChart(coin string,date time.Time) ([]bson.M, erro
 		"openTime_human_readible"    :    1,
 		"closeTime_human_readible"   :    1,
 	}
-	var limit int64    = 0
+	var limit int64    = 1
 	var sortOrder int  = -1
 	sortBy             := "created_date"
 	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
@@ -285,11 +287,11 @@ func GetLLSwingStatusFromCandleChart(coin string,date time.Time) ([]bson.M, erro
 	collectionName := "market_chart"
 	projection := bson.M{
 		"created_date"               :    1,
-		"highest_swing_point"        :    1,
+		"lowest_swing_point"        :    1,
 		"openTime_human_readible"    :    1,
 		"closeTime_human_readible"   :    1,
 	}
-	var limit int64    = 0
+	var limit int64    = 1
 	var sortOrder int  = -1
 	sortBy             := "created_date"
 	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
@@ -309,11 +311,11 @@ func GetHLSwingStatusFromCandleChart(coin string,date time.Time) ([]bson.M, erro
 	collectionName := "market_chart"
 	projection := bson.M{
 		"created_date"               :    1,
-		"highest_swing_point"        :    1,
+		"lowest_swing_point"        :    1,
 		"openTime_human_readible"    :    1,
 		"closeTime_human_readible"   :    1,
 	}
-	var limit int64    = 0
+	var limit int64    = 1
 	var sortOrder int  = -1
 	sortBy             := "created_date"
 	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
