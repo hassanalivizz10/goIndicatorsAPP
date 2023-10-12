@@ -1,5 +1,5 @@
 #first stage - builder
-FROM golang:1.15.11-stretch as indicatorsApp
+FROM FROM golang:1.16
 COPY . /indicatorsBuildAPP
 WORKDIR /indicatorsBuildAPP
 ENV GO111MODULE=on
