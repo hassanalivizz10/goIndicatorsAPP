@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 	//"reflect"
+	"strconv"
 	"encoding/json"
 	"indicatorsAPP/helpers"
 	"net/http"
@@ -13,54 +14,261 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/patrickmn/go-cache"
 )
 
+type Candle struct {
+    OpenTime int64  	    `json:"timestampDate"` 
+    Open     float64 		`json:"open"`
+    Coin     string  		`json:"coin"`
+    Low      float64 		`json:"low"`
+    High     float64 		`json:"high"`
+    Volume   float64 		`json:"volume"`
+    Close    float64 		`json:"close"`
+}
 var customLayout string
+var myCache = cache.New(5*time.Minute, 10*time.Minute)
 
 func init() {
 	customLayout = "2006-01-02 15:04:05"
 }
 
+// convert unix TimeStamp to DateTime (start of Hour)
+// Helper function to parse and format the start_date
+func formatStartDate(startDate interface{}) (string, error) {
+	// Check the data type of the interface variable
+
+    switch v := startDate.(type) {
+    case float64:
+        ts := int64(v)
+        startDate := time.Unix(ts, 0)
+        startDate = startDate.Truncate(time.Hour)
+        return startDate.Format(customLayout), nil
+    case string:
+        ts, err := strconv.ParseInt(v, 10, 64)
+        if err != nil {
+            return "", err
+        }
+        startDate := time.Unix(ts, 0)
+        startDate = startDate.Truncate(time.Hour)
+        return startDate.Format(customLayout), nil
+    default:
+        return "", fmt.Errorf("Invalid start date format")
+    }
+}
+
+// Helper function to parse and calculate the new date based on the duration
+func calculateNewDate(start time.Time, duration interface{}) (time.Time, error) {
+    switch v := duration.(type) {
+    case float64:
+        // Convert the duration to an integer number of weeks
+        weeks := int(v)
+        // Subtract the number of weeks from the start date
+        newDate := start.AddDate(0, 0, -7*weeks)
+		// Set minutes and seconds to zero to represent the start of the hour
+        newDate = newDate.Truncate(time.Hour)
+        return newDate, nil
+    case string:
+        // Attempt to convert the string to an integer
+        weeks, err := strconv.Atoi(v)
+        if err != nil {
+            return time.Time{}, err
+        }
+        // Subtract the number of weeks from the start date
+        newDate := start.AddDate(0, 0, -7*weeks)
+		// Set minutes and seconds to zero to represent the start of the hour
+        newDate = newDate.Truncate(time.Hour)
+        return newDate, nil
+    default:
+        return time.Time{}, fmt.Errorf("Invalid duration format")
+    }
+}
+
 // POST METHOD TO Get Candle Charts Data for Trading View Chart
-func fetchTradingDataByCoinHandler(c *gin.Context) {
+func FetchTradingDataByCoinHandler(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "tradingChart#(njVEkn2AEZ" && authHeader != "tradingChart#CJOMTGzhrB4" {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  401,
-			"data":    nil,
+			"allCandle":    nil,
 			"error":   "Auth Failed",
 			"message": "Request Blocked",
 		})
 		return
 	}
-	var errors []string
+//	var errors []string
 	requestBody, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(400, gin.H{
-			"error": "Failed to read request body",
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  400,
+			"allCandle":    nil,
+			"error":   "Failed to read request body",
+			"message": "Error On Your Request",
 		})
 		return
 	}
 	// Attempt to unmarshal the request body as JSON
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(requestBody, &jsonData); err != nil {
-		c.JSON(400, gin.H{
-			"error": "Invalid JSON data",
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  400,
+			"allCandle":    nil,
+			"error":   "Invalid JSON Data",
+			"message": "Error On Your Request",
 		})
 		return
 	}
 	if len(jsonData) != 0 {
+		coin, coinOK := jsonData["coin"].(string)
+		requestType, typeOK := jsonData["type"].(string)
+		durationStr, durationOK := jsonData["duration"].(string)
+		startDateUnix, startOK := jsonData["start_date"]
+		// if values not in the expected data types...
+		if !coinOK || !typeOK || !durationOK || !startOK {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  400,
+				"allCandle":    nil,
+				"error":   "Invalid request parameters",
+				"message": "Error On Your Request",
+			})
+			return
+		}
+		//  Parse and format the unixtimestamp start_date using the helper function 
+		startDateStr, err := formatStartDate(startDateUnix)
+		fmt.Println("startDateStr err",err)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  400,
+				"allCandle":    nil,
+				"error":   "Invalid start date format",
+				"message": "Error On Your Request",
+			})
+			return
+		} 
+		fmt.Println("startDateStr",startDateStr)
+		// Convert the startDateStr to time.Time with the custom layout
+		dateNow, err := time.Parse(customLayout, startDateStr)
+		fmt.Println("dateNow err",err)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  400,
+				"allCandle":    nil,
+				"error":   "Invalid start date format",
+				"message": "Error On Your Request",
+			})
+			return
+		}
+
+		dateFrom, err := calculateNewDate(dateNow,durationStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  400,
+				"data":    nil,
+				"error":   "Invalid duration format",
+				"message": "Error On Your Request",
+			})
+			return
+		}
+
+		fmt.Println("dateFrom",dateFrom)
+		fmt.Println("dateNow",dateNow)
+		
+		// Create the cache key
+		cacheKey := fmt.Sprintf("%s_%s_%d_%s", coin, requestType, durationStr, dateNow.Format(customLayout))	
+		if cachedResponse, found := myCache.Get(cacheKey); found {
+			// Return the cached response
+			c.JSON(http.StatusOK, gin.H{
+				"status":  200,
+				"allCandle":    cachedResponse,
+				"error":   "",
+				"message": "Data Returned Successfully",
+			})
+
+			return
+		} else {
+
+			data , err := helpers.FetchCandlesData(coin,requestType,dateFrom,dateNow)
+			if err!=nil || len(data) == 0{
+				c.JSON(http.StatusBadRequest, gin.H{
+					"status":  400,
+					"allCandle":    nil,
+					"error":   err.Error(),
+					"message":  "Error On Your Request",
+				})
+			}
+			response := buildCandlesData(data)
+			myCache.Set(cacheKey, response, cache.DefaultExpiration)
+
+
+			// query the data and cache it.
+			c.JSON(http.StatusOK, gin.H{
+				"status":  200,
+				"allCandle":    response,
+				"error":   "",
+				"message": "Data Returned Successfully",
+			})
+			return
+		}
 
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  400,
-			"data":    nil,              // Replace with your data
+			"allCandle":    nil,              // Replace with your data
 			"error":   "Params Missing", // Handle errors if necessary
 			"message": "Error On Your Request",
 		})
 		return
 
 	}
+}
+
+// Build Candle response
+func buildCandlesData(bsonData []bson.M) []Candle {
+	var candles []Candle
+	for _, doc := range bsonData {
+		var candle Candle
+		coin := doc["coin"].(string)
+		close , err :=  helpers.ConvertToType(doc["close"],float64(0))
+		if err!=nil{
+			fmt.Println("ERROR on buildCandlesData for close conversion",err.Error())
+			continue
+		}
+		high , err :=  helpers.ConvertToType(doc["high"],float64(0))
+		if err!=nil{
+			fmt.Println("ERROR on buildCandlesData for high conversion",err.Error())
+			continue
+		}
+		low , err :=  helpers.ConvertToType(doc["low"],float64(0))
+		if err!=nil{
+			fmt.Println("ERROR on buildCandlesData for low conversion",err.Error())
+			continue
+		}
+		open , err :=  helpers.ConvertToType(doc["open"],float64(0))
+		if err!=nil{
+			fmt.Println("ERROR on buildCandlesData for open conversion",err.Error())
+			continue
+		}
+		openTime , err :=  helpers.ConvertToType(doc["openTime"],int64(0))
+		if err!=nil{
+			fmt.Println("ERROR on buildCandlesData for openTime conversion",err.Error())
+			continue
+		}
+		volume , err :=  helpers.ConvertToType(doc["volume"],float64(0))
+		if err!=nil{
+			fmt.Println("ERROR on buildCandlesData for volume conversion",err.Error())
+			continue
+		}
+		candle.OpenTime = openTime.(int64)
+		candle.High = high.(float64)
+		candle.Coin = coin
+		candle.Low = low.(float64)
+		candle.Close = close.(float64)
+		candle.Open = open.(float64)
+		candle.Volume = volume.(float64)
+		
+		candles = append(candles, candle)
+	}
+	return candles
 }
 
 // POST METHOD to Calculate Daily Indicators
@@ -229,16 +437,29 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 					fmt.Printf("Hour %d: Start Date: %s, End Date: %s\n", i, currentStartDate.Format("2006-01-02 15:04:05"), currentEndDate.Format("2006-01-02 15:04:05"))
 					continue
 				}
-				fmt.Println("chartDataFetched", chartDataFetched)
+				//fmt.Println("chartDataFetched", chartDataFetched)
 				if len(chartDataFetched) == 0 {
 					resArr = append(resArr, "NO Data Found")
 					continue
 				}
-				fmt.Println("chartDataFetched", chartDataFetched)
+				//fmt.Println("chartDataFetched", chartDataFetched)
 				currentData := chartDataFetched[0]
 				open := currentData["open"].(float64)
 				close := currentData["close"].(float64)
+				coin := currentData["coin"].(string)
+				openTime_human_readible := currentData["openTime_human_readible"].(string)
+				filters := bson.M{
+					"coin":coin,
+					"openTime_human_readible":openTime_human_readible,
+				}
+				update := bson.M{}	
+
 				DP_UP_of_Candle := CalculateDPUPOfCandle(coin, currentStartDate, open, close)
+				
+
+				
+				//fmt.Println("DP_UP_of_Candle",DP_UP_of_Candle)
+				
 				toArr := make(map[string]interface{})
 				for key, value := range DP_UP_of_Candle {
 					toArr[key] = value
@@ -247,16 +468,39 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 				toArr["endCandleDate"] = currentEndDate
 				temp := map[string]interface{}{
 
-					"openTime_human_readible": currentData["openTime_human_readible"].(string),
+					"openTime_human_readible": openTime_human_readible,
 				}
 				resArr = append(resArr, temp)
-				//DP_UP_of_Candleperc := CalculateDPUPPercentiles(coin,toArr,30)
+				DP_UP_of_Candleperc := CalculateDPUPPercentiles(coin,toArr,30)
+				
+				
 				candel_trends = processCandelTrends(coin, currentStartDate, open, close)
-				fmt.Println("candel_trends", candel_trends)
-				resArr = append(resArr, DP_UP_of_Candle)
-				//resArr = append(resArr,DP_UP_of_Candleperc)
+				
+				
+				toUpdate := BuildHourlyUpdateArr(coin,DP_UP_of_Candle,DP_UP_of_Candleperc,candel_trends)
+				update = bson.M{
+					"$set":toUpdate,
+				}
+				err = helpers.UpdateHourlyData(filters,update)
+				if err!=nil{
+					fmt.Println("ERROR ON UpdateHourlyData main Call ",err.Error())
+				}
+				if coin == "BTCUSDT"{
+					updateAllCoinsBTC := modifyAndFilterKeysForBTC(toUpdate)
+					toUpdateBTCData := bson.M{"$set":updateAllCoinsBTC}
+					otherCoinsFilters := bson.M{"openTime_human_readible":openTime_human_readible,"coin": bson.M{
+						"$nin": []string{"BTCUSDT","POEBTC"},
+					}}
+					err := helpers.UpdateHourlyData(otherCoinsFilters,toUpdateBTCData)
+					if err!=nil{
+						fmt.Println("ERROR ON UpdateHourlyData main Call ",err.Error())
+					}
+				}
 
-				fmt.Println("open", open, "close", close)
+				resArr = append(resArr, DP_UP_of_Candle)
+				resArr = append(resArr,DP_UP_of_Candleperc)
+
+				
 			}
 
 			c.JSON(http.StatusOK, gin.H{
@@ -288,6 +532,52 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 		})
 		return
 	} // ends outer if no errors
+}
+
+// FOR BTC 
+func modifyAndFilterKeysForBTC(input bson.M) bson.M {
+	result := bson.M{}
+
+	for key, value := range input {
+		// Check if the key is one of the keys that should be modified
+		if key == "DP1" || key == "DP2" || key == "DP3" ||
+			key == "UP1" || key == "UP2" || key == "UP3" ||
+			key == "DP1_perc" || key == "DP2_perc" || key == "DP3_perc" ||
+			key == "UP1_perc" || key == "UP2_perc" || key == "UP3_perc" || key == "new_go_indicators" {
+			newKey := key + "_btc"
+			result[newKey] = value
+		}
+	}
+
+	return result
+}
+
+func BuildHourlyUpdateArr(coin string,DP_UP_of_Candle map[string]float64,DP_UP_of_Candleperc map[string]string,candel_trends []bson.M) bson.M{
+	update := bson.M{
+		"DP1":DP_UP_of_Candle["DP1"],
+		"DP2":DP_UP_of_Candle["DP2"],
+		"DP3":DP_UP_of_Candle["DP3"],
+		"UP1":DP_UP_of_Candle["UP1"],
+		"UP2":DP_UP_of_Candle["UP2"],
+		"UP3":DP_UP_of_Candle["UP3"],
+		"DP1_perc":DP_UP_of_Candleperc["DP1"],
+		"DP2_perc":DP_UP_of_Candleperc["DP2"],
+		"DP3_perc":DP_UP_of_Candleperc["DP3"],
+		"UP1_perc":DP_UP_of_Candleperc["UP1"],
+		"UP2_perc":DP_UP_of_Candleperc["UP2"],
+		"UP3_perc":DP_UP_of_Candleperc["UP3"],
+	}
+
+	dp1 , _  := helpers.ToFloat64(DP_UP_of_Candleperc["DP1"])
+	dp2 , _  := helpers.ToFloat64(DP_UP_of_Candleperc["DP2"])
+	dp3 , _  := helpers.ToFloat64(DP_UP_of_Candleperc["DP3"])
+	update["DP3_DP1_perc"] = dp3 - dp1
+	update["DP2_DP1_perc"] = dp2 - dp1
+	update["candel_trends"] = candel_trends[0]["candel_trends"]
+	update["new_go_indicators"] = 1
+ 
+	return update
+
 }
 
 func calculateHourDifference(startDateString, endDateString string) (int, time.Time, error) {

@@ -9,6 +9,37 @@ import(
 	"fmt"
 )
 
+
+
+func FetchCandlesData(coin , queryType string,start time.Time,end time.Time)([]bson.M, error){
+	collectionName := "market_chart"
+	if queryType == "daily"{
+		collectionName = "market_chart_daily"
+	}
+	filters := bson.M{
+		"coin":coin,
+		"created_date": bson.M{"$gte": start, "$lte": end},
+	}
+	projection := bson.M{
+		"_id"            : 0 ,
+		"openTime":                1,
+		"open":                    1,
+		"coin":                    1,
+		"low":                     1,
+		"high":                    1,
+		"volume":                  1,
+		"close":                   1,
+	}
+	var limit int64 = 0
+	var sortOrder int  = -1
+	sortBy := "created_date"
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
 func MarketChartDataForCoin(filters bson.M) ([]bson.M, error){
 	collectionName := "market_chart"
 	projection := bson.M{
@@ -606,4 +637,49 @@ func UpdateDailyData(filters,update bson.M) error{
 	collectionName := "market_chart_daily"
 	err := mongohelpers.MongoUpdateOne(collectionName,filters,update,false)
 	return err
+}
+
+// ConvertToType attempts to convert an interface to the specified target type.
+func ConvertToType(value interface{}, targetType interface{}) (interface{}, error) {
+    switch targetType.(type) {
+    case int:
+        if v, ok := value.(int); ok {
+            return v, nil
+        }
+    case int16:
+        if v, ok := value.(int16); ok {
+            return v, nil
+        }
+    case int32:
+        if v, ok := value.(int32); ok {
+            return v, nil
+        }
+    case int64:
+        if v, ok := value.(int64); ok {
+            return v, nil
+        }
+    case float32:
+        if v, ok := value.(float32); ok {
+            return v, nil
+        }
+    case float64:
+        if v, ok := value.(float64); ok {
+            return v, nil
+        }
+    case string:
+        if v, ok := value.(string); ok {
+            return v, nil
+        }
+    }
+
+    return nil, fmt.Errorf("Conversion not supported")
+}
+
+func UpdateHourlyData(filters , toSet bson.M)error{
+	collectionName := "market_chart"
+	err := mongohelpers.MongoUpdateOne(collectionName,filters,toSet,false)
+	if err !=nil{
+		return err
+	}
+	return nil
 }

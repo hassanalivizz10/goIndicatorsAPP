@@ -9,9 +9,9 @@ func SetupRouter() *gin.Engine {
 	router := gin.Default()
 
 	// Define API routes and attach handlers
-	router.POST("/createUpdateDailyIndicators", api.CreateUpdateDailyIndicatorsHandler)
-	router.POST("/setHourlyIndicators", api.SetHourlyIndicatorsHandler)
-	outer.POST("/fetchTradingDataByCoin", api.fetchTradingDataByCoinHandler)
+	router.POST("/apiEndPoint/createUpdateDailyIndicators", api.CreateUpdateDailyIndicatorsHandler)
+	router.POST("/apiEndPoint/setHourlyIndicators", api.SetHourlyIndicatorsHandler)
+	router.POST("/apiEndPoint/fetchTradingDataByCoin", api.FetchTradingDataByCoinHandler)
 	// router.GET("/api/resource", handler.GetResource)
 	// Add more routes here
 
