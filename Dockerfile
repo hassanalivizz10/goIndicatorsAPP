@@ -1,5 +1,5 @@
 #first stage - builder
-FROM FROM golang:1.16
+FROM golang:1.16 as indicatorsApp
 COPY . /indicatorsBuildAPP
 WORKDIR /indicatorsBuildAPP
 ENV GO111MODULE=on
