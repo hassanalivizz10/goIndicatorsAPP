@@ -7,7 +7,9 @@ import (
 
 func SetupRouter() *gin.Engine {
 	router := gin.Default()
-
+	router.GET("/", func(c *gin.Context) {
+        c.String(http.StatusOK, "Hello, world!")
+    })
 	// Define API routes and attach handlers
 	router.POST("/apiEndPoint/createUpdateDailyIndicators", api.CreateUpdateDailyIndicatorsHandler)
 	router.POST("/apiEndPoint/setHourlyIndicators", api.SetHourlyIndicatorsHandler)
