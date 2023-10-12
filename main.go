@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-   "indicatorsAPP/apiroutes"
+   "indicatorsAPP/routes"
     "indicatorsAPP/cron"
 	"indicatorsAPP/config"
     "log"
@@ -42,7 +42,7 @@ func main() {
 		log.Fatal("Failed to connect to MongoDB:", err)
 	}
     // Start HTTP server with API routes
-    go apiroutes.StartServer()
+    go routes.StartServer()
 
     // Start cron jobs
     cron.StartCronJobs()
