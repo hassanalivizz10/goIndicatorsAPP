@@ -6,9 +6,11 @@ import (
 )
 
 func SetupRouter() *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+
 	router := gin.Default()
 	router.GET("/", func(c *gin.Context) {
-        c.String(http.StatusOK, "Hello, world!")
+        c.String(200, "Hello, world!")
     })
 	// Define API routes and attach handlers
 	router.POST("/apiEndPoint/createUpdateDailyIndicators", api.CreateUpdateDailyIndicatorsHandler)
