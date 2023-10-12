@@ -21,7 +21,7 @@ var openPrices []CoinData
 var coinListCache []bson.M
 var bigDropRaiseMutex sync.Mutex
 // Defaults ....
-var bigDropFactorValue  float64  =  5
+var bigDropFactorValue  float64  = 3
 var bigRaiseFactorValue float64 = 3.5
 
 type CoinData struct {
