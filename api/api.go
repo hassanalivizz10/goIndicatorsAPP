@@ -188,14 +188,28 @@ func FetchTradingDataByCoinHandler(c *gin.Context) {
 		} else {
 
 			data , err := helpers.FetchCandlesData(coin,requestType,dateFrom,dateNow)
-			if err!=nil || len(data) == 0{
+			if err!=nil{
 				c.JSON(http.StatusBadRequest, gin.H{
 					"status":  400,
 					"allCandle":    nil,
 					"error":   err.Error(),
 					"message":  "Error On Your Request",
 				})
+				return
 			}
+			//message := "Empty Data Found For Your Request For"+fmt.Sprintf(" coin %s type %s duration %d date from %s date to %s", coin, requestType, durationStr,dateFrom.Format(customLayout), dateNow.Format(customLayout))
+			message := fmt.Sprintf("Empty Data Found For Your Request For coin %s type %s duration %s date from %s date to %s", coin, requestType, durationStr, dateFrom.Format(customLayout), dateNow.Format(customLayout))
+
+			if len(data) == 0{
+				c.JSON(http.StatusBadRequest, gin.H{
+					"status":  400,
+					"allCandle":    nil,
+					"error":   message,
+					"message":  "Error On Your Request",
+				})
+				return
+			}
+
 			response := buildCandlesData(data)
 			myCache.Set(cacheKey, response, cache.DefaultExpiration)
 
