@@ -30,7 +30,7 @@ func BigRaisePullBack(){
 		pull_back_created_date = time.Unix(0, int64(createdDatePrimitive)*int64(time.Millisecond)).UTC()
 	} 
 	
-	fmt.Println("pull_back_created_date",pull_back_created_date)
+	//fmt.Println("pull_back_created_date",pull_back_created_date)
 	id                     := current["_id"].(primitive.ObjectID);
 	coinSymbol             := current["coin"].(string)
     pull_back_price        := current["pull_back_price"].(float64)
@@ -49,7 +49,7 @@ func BigRaisePullBack(){
 	}
 	fmt.Println("raised_back",raised_back)
 	if len(raised_back) == 0{
-		fmt.Println("raised_back Not Found for coin")
+		//fmt.Println("raised_back Not Found for coin")
 		bigRaisePullBackMutex.Unlock()
 		continue
 	}

@@ -25,5 +25,5 @@ func SetupRouter() *gin.Engine {
 func StartServer() {
 	router := SetupRouter()
 	// Configure server settings (e.g., port)
-	router.Run(":2608")
+	router.Run(":3001")
 }

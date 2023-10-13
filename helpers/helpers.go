@@ -431,7 +431,7 @@ func getStartOfCurrentHour() string {
 	startOfCurrentHour := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), currentTime.Hour(), 0, 0, 0,currentTime.Location())
 	startOfCurrentHour = startOfCurrentHour.Add(-time.Hour) // Decrement the hour by 1 to get the previous hour
 	strDate := startOfCurrentHour.Format("2006-01-02 15:04:05")
-	fmt.Println("strDate",strDate)
+	//fmt.Println("strDate",strDate)
 	return strDate
 }
 
@@ -473,6 +473,7 @@ func FetchMarketPrices(coin string,timestamp time.Time) ([]bson.M,error) {
 	projection := bson.M{
 		"created_date":1,
 		"price":1,
+		"coin":1,
 	}
 	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
 	if err!=nil{

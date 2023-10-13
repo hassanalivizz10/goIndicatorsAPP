@@ -51,7 +51,7 @@ func RunBigRaiseAndBigDrop(){
 	currentHourDate := time.Date(currentDateTime.Year(), currentDateTime.Month(), currentDateTime.Day(), currentDateTime.Hour(), 0, 0, 0, currentDateTime.Location())
 
 	if lastHourReset.IsZero() || currentHourDate.After(lastHourReset) {
-		fmt.Println("Listing coins")
+		//fmt.Println("Listing coins")
 		openPrices = nil
 		lastHourReset = currentHourDate
 	}
@@ -68,7 +68,7 @@ func RunBigRaiseAndBigDrop(){
 	//coinList a bson.M document
 	for _, currentCoin := range coinListCache {
 		coinSymbol := currentCoin["symbol"].(string)
-		fmt.Println("coinSymbol"+coinSymbol,time.Now().UTC())
+		
 		bigDropRaiseMutex.Lock()
 		foundPriceObject := findPriceObject(coinSymbol, currentHourDate)
 		if foundPriceObject != nil {
@@ -84,7 +84,7 @@ func RunBigRaiseAndBigDrop(){
 			continue
 		}
 		if len(bodyMoveAverage) == 0 || len(bodyMoveAverage[0]) == 0 {
-			fmt.Println("bodyMoveAverage is empty "+coinSymbol,bodyMoveAverage)
+			//fmt.Println("bodyMoveAverage is empty "+coinSymbol,bodyMoveAverage)
 			bigDropRaiseMutex.Unlock()
 			continue
 		}
@@ -93,15 +93,19 @@ func RunBigRaiseAndBigDrop(){
 		if val , ok := bodyMoveAverage[0]["body_move_average"].(float64); ok{
 			body_move_average = val
 		} else {
-			fmt.Println("bodyMoveAverage is missing ",bodyMoveAverage[0])
+			//fmt.Println("bodyMoveAverage is missing ",coinSymbol)
+			bigDropRaiseMutex.Unlock()
 			continue;
 		}
 		DropPercValue  := body_move_average *  bigDropFactorValue
 		RaisePercvalue := body_move_average * bigRaiseFactorValue
+		//fmt.Println("coinSymbol"+coinSymbol,time.Now().UTC())
 		currentOpenPrice, err := getOpenPrice(coinSymbol)
+		//fmt.Println("currentOpenPrice",currentOpenPrice)
 		if err != nil {
 			fmt.Println("Error fetching open price for", coinSymbol, ":", err)
 			bigDropRaiseMutex.Unlock()
+			continue;
 		}
 
 		DropTrailingPrice  := currentOpenPrice - ((currentOpenPrice * DropPercValue) / 100)
@@ -124,7 +128,7 @@ func RunBigRaiseAndBigDrop(){
 		openPrices = append(openPrices, priceObject)
 		bigDropRaiseMutex.Unlock()
 	} // ends coinListCache forLoop
-	fmt.Println("Time Now Data",time.Now().UTC())
+	//fmt.Println("Time Now Data",time.Now().UTC())
 	
 	for _, priceData := range openPrices {
 		dataToParse := priceData
@@ -134,31 +138,35 @@ func RunBigRaiseAndBigDrop(){
 		dropPrice := dataToParse.DropTrailingPrice
 		bodyMoveValue := dataToParse.PerMove
 		OpenPrice := dataToParse.OpenPrice
-		fmt.Println("openPrices started"+coin,"raisePrice",raisePrice,"dropPrice",dropPrice,"OpenPrice",OpenPrice)
+		//fmt.Println("openPrices started"+coin,"raisePrice",raisePrice,"dropPrice",dropPrice,"OpenPrice",OpenPrice)
 		dateNow := time.Now().UTC()
 		startTime := getStartTime(dateNow)
 		RaiseFound :=  false
 		DropFound :=  false
 
 		if hasTimeChanged(lastHourReset) {
-			fmt.Println("Breaking big Drop for", lastHourReset, time.Now().UTC())
+			fmt.Println("Breaking big Drop and raise after hour change", lastHourReset, time.Now().UTC())
 			break
 		}
-		pricesData , err := helpers.FetchMarketPrices(coin, startTime)
+		pricesArr , err := helpers.FetchMarketPrices(coin, startTime)
 		if err!=nil{
 			fmt.Println("ERROR ON FetchMarketPrices"+coin,err)
 		}
-		if len(pricesData) == 0  || len(pricesData[0]) == 0 {
+		if len(pricesArr) == 0  || len(pricesArr[0]) == 0 {
 			fmt.Println("Found Empty on FetchMarketPrices"+coin)
 		}
 		var currentPrice float64
 	
-		//fmt.Println("pricess",pricesData[0]["price"])
-		currentPrice , ok := helpers.ToFloat64(pricesData[0]["price"])
+		//fmt.Println("pricess",pricesArr[0]["price"])
+		currentPrice , ok := helpers.ToFloat64(pricesArr[0]["price"])
 		if !ok{
 			fmt.Println("currentPrice Unsupported numeric type errored")
 			continue;
 		}
+		//fmt.Println("priceData",priceData)
+		//fmt.Println("pricesArr",pricesArr)
+		//fmt.Println("currentPrice",currentPrice,"coin",coin)
+		fmt.Println("Tracking Pull Back Price"+coin,"raisePrice",raisePrice,"dropPrice",dropPrice,"OpenPrice",OpenPrice,"currentPrice",currentPrice)
 		//currentPrice := pricesData[0]["price"].(float64)
 		if currentPrice > raisePrice {
 			RaiseFound = true
