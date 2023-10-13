@@ -45,7 +45,7 @@ func BigDropPullBack(){
 	}
 	fmt.Println("pulled_back",pulled_back)
 	if len(pulled_back) == 0{
-		fmt.Println("pulled_back Not Found for coin")
+		//fmt.Println("pulled_back Not Found for coin")
 		bigDropPullBackMutex.Unlock()
 		continue
 	}
