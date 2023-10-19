@@ -21,7 +21,7 @@ var openPrices []CoinData
 var coinListCache []bson.M
 var bigDropRaiseMutex sync.Mutex
 // Defaults ....
-var bigDropFactorValue  float64  = 4
+var bigDropFactorValue  float64  = 4.5
 var bigRaiseFactorValue float64 = 3.5
 
 type CoinData struct {
@@ -166,7 +166,7 @@ func RunBigRaiseAndBigDrop(){
 		//fmt.Println("priceData",priceData)
 		//fmt.Println("pricesArr",pricesArr)
 		//fmt.Println("currentPrice",currentPrice,"coin",coin)
-		fmt.Println("Tracking Pull Back Price"+coin,"raisePrice",raisePrice,"dropPrice",dropPrice,"OpenPrice",OpenPrice,"currentPrice",currentPrice)
+		//fmt.Println("Tracking Pull Back Price"+coin,"raisePrice",raisePrice,"dropPrice",dropPrice,"OpenPrice",OpenPrice,"currentPrice",currentPrice)
 		//currentPrice := pricesData[0]["price"].(float64)
 		if currentPrice > raisePrice {
 			RaiseFound = true
@@ -215,6 +215,10 @@ func RunBigRaiseAndBigDrop(){
 			err:= helpers.AddRaiseDropEntry(raiseFilters, raiseUpdate , upsert)
 			if err!=nil{
 				fmt.Println("AddRaiseDropEntry has ERRORED for BIG RAISE FOUND"+coin,err)
+			}
+			err = helpers.InsertTestData(raiseUpdate)
+			if err!=nil{
+				fmt.Println("InsertTestData has ERRORED for BIG RAISE FOUND"+coin,err)
 			}
 		} 
 		fmt.Println("RaiseFound"+coin,RaiseFound)

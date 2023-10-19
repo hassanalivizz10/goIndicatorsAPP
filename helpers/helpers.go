@@ -585,6 +585,15 @@ func AddCandleTrack(data bson.M) error{
 	return nil
 }
 
+func InsertTestData(data bson.M) error{
+	collectionName := "logs_testing_big_drop_raise"
+	_ , err := mongohelpers.MongoInsertOne(collectionName,data)
+	if err !=nil{
+		return err
+	}
+	return nil
+}
+
 func ToFloat64(value interface{}) (float64, bool) {
     switch v := value.(type) {
 	case int:
