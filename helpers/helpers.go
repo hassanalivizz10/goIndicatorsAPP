@@ -442,7 +442,7 @@ func GetBodyMoveAverage(coin string) ([]bson.M,error) {
 	var sortBy string = "created_date"
 	filters  := bson.M{
 		"coin":                   coin,
-		"openTime_human_readible": getStartOfCurrentHour(),
+		// "openTime_human_readible": getStartOfCurrentHour(),
 	}
 	projection := bson.M{
 		"close":                 1,
