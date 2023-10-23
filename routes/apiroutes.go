@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"indicatorsAPP/api"
+	"indicatorsAPP/utils"
 )
 
 func SetupRouter() *gin.Engine {
@@ -23,7 +24,11 @@ func SetupRouter() *gin.Engine {
 }
 
 func StartServer() {
+	port := utils.GetEnv("APP_PORT")
+	if port == ""{
+		port = "2607";
+	}
 	router := SetupRouter()
 	// Configure server settings (e.g., port)
-	router.Run(":2608")
+	router.Run(":"+port)
 }
