@@ -21,7 +21,7 @@ var openPrices []CoinData
 var coinListCache []bson.M
 var bigDropRaiseMutex sync.Mutex
 // Defaults ....
-var bigDropFactorValue  float64  = 4.5
+var bigDropFactorValue  float64  = 5
 var bigRaiseFactorValue float64 = 3.5
 
 type CoinData struct {
@@ -216,13 +216,13 @@ func RunBigRaiseAndBigDrop(){
 			if err!=nil{
 				fmt.Println("AddRaiseDropEntry has ERRORED for BIG RAISE FOUND"+coin,err)
 			}
-			err = helpers.InsertTestData(raiseUpdate)
+			err = helpers.InsertTestData(raiseUpdate["$set"])
 			if err!=nil{
 				fmt.Println("InsertTestData has ERRORED for BIG RAISE FOUND"+coin,err)
 			}
 		} 
-		fmt.Println("RaiseFound"+coin,RaiseFound)
-		fmt.Println("DropFound"+coin,DropFound)
+		//fmt.Println("RaiseFound"+coin,RaiseFound)
+		//fmt.Println("DropFound"+coin,DropFound)
 		
 	} // ends openPrices loop
 }

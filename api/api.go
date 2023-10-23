@@ -135,7 +135,7 @@ func FetchTradingDataByCoinHandler(c *gin.Context) {
 		}
 		//  Parse and format the unixtimestamp start_date using the helper function 
 		startDateStr, err := formatStartDate(startDateUnix)
-		fmt.Println("startDateStr err",err)
+		//fmt.Println("startDateStr err",err)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  400,
@@ -145,10 +145,10 @@ func FetchTradingDataByCoinHandler(c *gin.Context) {
 			})
 			return
 		} 
-		fmt.Println("startDateStr",startDateStr)
+		//fmt.Println("startDateStr",startDateStr)
 		// Convert the startDateStr to time.Time with the custom layout
 		dateNow, err := time.Parse(customLayout, startDateStr)
-		fmt.Println("dateNow err",err)
+		//fmt.Println("dateNow err",err)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  400,
@@ -170,8 +170,8 @@ func FetchTradingDataByCoinHandler(c *gin.Context) {
 			return
 		}
 
-		fmt.Println("dateFrom",dateFrom)
-		fmt.Println("dateNow",dateNow)
+		//fmt.Println("dateFrom",dateFrom)
+		//fmt.Println("dateNow",dateNow)
 		
 		// Create the cache key
 		cacheKey := fmt.Sprintf("%s_%s_%d_%s", coin, requestType, durationStr, dateNow.Format(customLayout))	

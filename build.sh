@@ -1,5 +1,5 @@
 #!/bin/bash
-PORT="2608"
+PORT="2607"
 # Append custom text to the Name
 APP="golang-indicators-app"
 ### pull from server
