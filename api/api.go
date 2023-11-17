@@ -315,8 +315,8 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Println("jsonData", jsonData)
-	fmt.Println(len(jsonData))
+	//fmt.Println("jsonData", jsonData)
+	//fmt.Println(len(jsonData))
 	if len(jsonData) != 0 {
 		if coin := jsonData["coin"].(string); coin == "" {
 			errors = append(errors, "Coin is Required Field")
@@ -338,7 +338,7 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 
 			diffInDays = int(endDate.Sub(startDate).Hours() / 24)
 		}
-		fmt.Println("errors", errors)
+		//fmt.Println("errors", errors)
 		if len(errors) > 0 {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  400,
@@ -385,7 +385,7 @@ func CreateUpdateDailyIndicatorsHandler(c *gin.Context) {
 
 // POST METHOD to Set Hourly Indicators
 func SetHourlyIndicatorsHandler(c *gin.Context) {
-	fmt.Println("SetHourlyIndicatorsHandler")
+	//fmt.Println("SetHourlyIndicatorsHandler")
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "indicators#(njVEkn2AEZ" && authHeader != "indicators#CJOMTGzhrB4" {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -444,7 +444,7 @@ func SetHourlyIndicatorsHandler(c *gin.Context) {
 				where := bson.M{}
 				where["coin"] = coin
 				where["created_date"] = bson.M{"$gte": currentStartDate, "$lte": currentEndDate}
-				fmt.Println("where", where)
+				//fmt.Println("where", where)
 				chartDataFetched, err := helpers.MarketChartDataForCoin(where)
 				if err != nil {
 					fmt.Println("Error on MarketChartDataForCoin for Date")
@@ -715,7 +715,7 @@ func getDPUPPercentiles(arr []float64, index string) map[string]float64 {
 		objToReturn[indexName] = valueToAssign
 	}
 	if index == "DP1" {
-		fmt.Println("get_DP_UP_percentiles for index : "+index, objToReturn)
+		//fmt.Println("get_DP_UP_percentiles for index : "+index, objToReturn)
 	}
 
 	return objToReturn
@@ -859,7 +859,7 @@ func CalculateDPUPPercentiles(coin string, toArr map[string]interface{}, duratio
 	finalArr["UP1"] = currUP1
 	finalArr["UP2"] = currUP2
 	finalArr["UP3"] = currUP3
-	fmt.Println("calculate_DP_UP_percentiles final_arr", finalArr)
+	//fmt.Println("calculate_DP_UP_percentiles final_arr", finalArr)
 	return finalArr
 }
 
@@ -1266,7 +1266,7 @@ func dpupTrendDirectionCalculations(coin string, startDate, endDate time.Time) (
 }
 
 func calculateDailyTrend(coin string, startDate, endDate time.Time) (map[string]interface{}, error) {
-	fmt.Println("inside Daily Trend")
+	//fmt.Println("inside Daily Trend")
 
 	var getTrend map[string]interface{}
 	var limit int64 = 2
