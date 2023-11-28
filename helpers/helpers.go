@@ -60,6 +60,7 @@ func MarketChartDataForCoin(filters bson.M) ([]bson.M, error){
 			"close":                   1,
 			"openTime_human_readible": 1,
 			"closeTime_human_readible": 1,
+			
 	}
 	var limit int64 = 0
 	var sortOrder int  = 0
@@ -460,6 +461,27 @@ func GetBodyMoveAverage(coin string) ([]bson.M,error) {
 	return docs , nil
 }
 
+func GetCoinCurrentWickMove(coin string) ([]bson.M,error) {
+	collectionName := "market_chart"
+	var limit int64 = 1
+	var sortOrder int = -1
+	var sortBy string = "created_date"
+	filters  := bson.M{
+		"coin":                   coin,
+		// "openTime_human_readible": getStartOfCurrentHour(),
+	}
+	projection := bson.M{
+		"lower_wick_per_move" : 1,
+	}
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
+
+
 
 func FetchMarketPrices(coin string,timestamp time.Time) ([]bson.M,error) {
 	collectionName := "market_prices"
@@ -693,3 +715,107 @@ func UpdateHourlyData(filters , toSet bson.M)error{
 	}
 	return nil
 }
+
+func GetCurrentDownBarrier(coin string,market_price float64)([]bson.M, error){
+	collectionName := "barrier_values_collection"
+	
+	filters := bson.M{
+		"coin":coin,
+		"barrier_type":"down",
+		"barrier_status":"very_strong_barrier",
+		//"barier_value": bson.M{"$gte": market_price},
+	}
+	projection := bson.M{
+		"_id"           				 : 0 ,
+		"barier_value"                   : 1,
+		"coin"                           : 1,
+		"created_date"                   : 1,
+		"global_swing_parent_status"     : 1,
+
+	}
+	// find first record sorted by date.
+	var limit int64 = 1
+	var sortOrder int  = -1
+	sortBy := "created_date"
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
+func GetLastDownBarrier(coin string,currentBarrierTime time.Time) ([]bson.M,error){
+	
+	collectionName := "barrier_values_collection"
+	
+	filters := bson.M{
+		"coin":coin,
+		"barrier_type":"down",
+		"barrier_status":"very_strong_barrier",
+		"created_date": bson.M{"$lte": currentBarrierTime},
+	}
+	projection := bson.M{
+		"_id"           				 : 0 ,
+		"barier_value"                   : 1,
+		"coin"                           : 1,
+		"created_date"                   : 1,
+		"global_swing_parent_status"     : 1,
+
+	}
+	// find first record sorted by date.
+	var limit int64 = 1
+	var sortOrder int  = -1
+	sortBy := "created_date"
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
+
+func GetNextSwingPoint(coin string,currentBarrierTime time.Time) ([]bson.M,error){
+	
+	collectionName := "barrier_values_collection"
+	
+	filters := bson.M{
+		"coin":coin,
+		"barrier_type":"up",
+		"barrier_status":"very_strong_barrier",
+		"created_date": bson.M{"$gte": currentBarrierTime},
+	}
+	projection := bson.M{
+		"_id"           				 : 0 ,
+		"barier_value"                   : 1,
+		"coin"                           : 1,
+		"created_date"                   : 1,
+		"global_swing_parent_status"     : 1,
+
+	}
+	// find first record sorted by date.
+	var limit int64 = 1
+	var sortOrder int  = 1
+	sortBy := "created_date"
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
+func UpdateDownBarrierRejectionData(id primitive.ObjectID,data bson.M) error{
+	collectionName := "market_chart"
+	filters := bson.M{
+		"_id" : id,
+	}
+	upsert := false
+	toSet := bson.M{
+		"$set":data,
+	}
+	err := mongohelpers.MongoUpdateOne(collectionName,filters,toSet,upsert)
+	if err !=nil{
+		return err
+	}
+	return nil	
+}
+

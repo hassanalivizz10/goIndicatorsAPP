@@ -141,7 +141,7 @@ func RunBigRaiseAndBigDrop(){
 		OpenPrice := dataToParse.OpenPrice
 		//fmt.Println("openPrices started"+coin,"raisePrice",raisePrice,"dropPrice",dropPrice,"OpenPrice",OpenPrice)
 		dateNow := time.Now().UTC()
-		startTime := getStartTime(dateNow)
+		startTime := GetStartTime(dateNow)
 		
 
 		if hasTimeChanged(lastHourReset) {
@@ -282,7 +282,7 @@ func findPriceObject(coinSymbol string, currentHourDate time.Time) *CoinData {
 }
 
 
-func getStartTime(dateNow time.Time) time.Time {
+func GetStartTime(dateNow time.Time) time.Time {
 	var startTime time.Time
 	switch {
 	case dateNow.Minute() >= 0 && dateNow.Minute() <= 15:

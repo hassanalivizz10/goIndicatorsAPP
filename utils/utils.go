@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"reflect"
 	"time"
 	"github.com/joho/godotenv"
 	
@@ -160,4 +161,46 @@ func FormatTimeAgo(from time.Time, to time.Time) string {
 
 	// Return the formatted result
 	return fmt.Sprintf("%d %s ago", value, unit)
+}
+
+
+func ConvertToTime(value interface{}) (time.Time, error) {
+	checkType(value)
+	if t, ok := value.(time.Time); ok {
+		return t, nil // It's already a time.Time
+	}
+	if dt, ok := value.(primitive.DateTime); ok {
+		// Use the Time() method provided by primitive.DateTime
+		return dt.Time(), nil
+	}
+
+	// If not a time.Time, try converting
+	switch v := value.(type) {
+	case int64:
+		// Assuming it's a Unix timestamp in milliseconds
+		return time.Unix(0, v*int64(time.Millisecond)), nil
+	default:
+		
+		return time.Time{}, fmt.Errorf("unsupported type for conversion to time.Time")
+	}
+}
+func checkType(variable interface{}) {
+	v := reflect.ValueOf(variable)
+	t := v.Type()
+
+	fmt.Printf("Variable Type: %s\n", t)
+	return
+}
+
+func PrintStructValues(s interface{}) {
+	val := reflect.ValueOf(s)
+	typ := reflect.TypeOf(s)
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldName := typ.Field(i).Name
+		fieldValue := field.Interface()
+
+		fmt.Printf("%s: %v\n", fieldName, fieldValue)
+	}
 }
