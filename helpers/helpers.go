@@ -752,7 +752,7 @@ func GetLastDownBarrier(coin string,currentBarrierTime time.Time) ([]bson.M,erro
 		"coin":coin,
 		"barrier_type":"down",
 		"barrier_status":"very_strong_barrier",
-		"created_date": bson.M{"$lte": currentBarrierTime},
+		"created_date": bson.M{"$lt": currentBarrierTime},
 	}
 	projection := bson.M{
 		"_id"           				 : 0 ,
@@ -781,8 +781,9 @@ func GetNextSwingPoint(coin string,currentBarrierTime time.Time) ([]bson.M,error
 	filters := bson.M{
 		"coin":coin,
 		"barrier_type":"up",
+		"global_swing_parent_status" : "HH",
 		"barrier_status":"very_strong_barrier",
-		"created_date": bson.M{"$gte": currentBarrierTime},
+		//"created_date": bson.M{"$lte": currentBarrierTime},
 	}
 	projection := bson.M{
 		"_id"           				 : 0 ,
@@ -794,7 +795,7 @@ func GetNextSwingPoint(coin string,currentBarrierTime time.Time) ([]bson.M,error
 	}
 	// find first record sorted by date.
 	var limit int64 = 1
-	var sortOrder int  = 1
+	var sortOrder int  = -1
 	sortBy := "created_date"
 	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
 	if err!=nil{

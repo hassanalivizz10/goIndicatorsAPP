@@ -19,6 +19,7 @@ var coinListCacheForBarrier []bson.M
 var rejectionMutex sync.Mutex
 // Defaults ....
 var wickMoveFactorValue  float64  = 2
+var debug = false
 
 type BarriersDataStruct struct {
 	Symbol                 		string 
@@ -27,9 +28,10 @@ type BarriersDataStruct struct {
 	NextHighSwingPoint          float64
 	CurrentDownBarrierTime      time.Time 
 	PreviousDownBarrierTime     time.Time 
-	NextHighSwingTime     		time.Time
+	HighSwingTime     		    time.Time
 	Date 						time.Time
-	PointDiff					float64
+	HighPointDiff			    float64
+	LowPointDiff			    float64
 	Wickvalue					float64
 	Triggered					bool
 	BarrierDropped				bool 
@@ -56,7 +58,7 @@ func RunDownBarrierRejection(){
 	if len(coinListCacheForBarrier) ==0 {
 		coinList , err := helpers.ListCoins()
 		if err!=nil{
-			fmt.Println("Big Raise and Drop Error",err)
+			debugLogs("RunDownBarrierRejection Error",err)
 			return
 		}
 		coinListCacheForBarrier = coinList
@@ -65,11 +67,13 @@ func RunDownBarrierRejection(){
 	//coinList a bson.M document
 	for _, currentCoin := range coinListCacheForBarrier {
 		coinSymbol := currentCoin["symbol"].(string)
-		
+		if coinSymbol != "LINKUSDT" && coinSymbol != "DOTBTC" {
+			continue;
+		}	
 		rejectionMutex.Lock()
 		foundPriceObject := findBarriersObject(coinSymbol, currentHourDate)
 		if foundPriceObject != nil {
-			//fmt.Println("Big Drop Found in foundPriceObject for coin:", coinSymbol, *foundPriceObject)
+			debugLogs("Big Drop Found in foundPriceObject for coin:", coinSymbol, *foundPriceObject)
 			rejectionMutex.Unlock()
 			continue
 		}
@@ -83,12 +87,12 @@ func RunDownBarrierRejection(){
 		pricesArr , err := helpers.FetchMarketPrices(coinSymbol, startTime)
 		
 		if err!=nil{
-			fmt.Println("ERROR ON down barrier rejection FetchMarketPrices"+coinSymbol,err)
+			debugLogs("ERROR ON down barrier rejection FetchMarketPrices"+coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue;
 		}
 		if len(pricesArr) == 0  || len(pricesArr[0]) == 0 {
-			fmt.Println("Found Empty on down barrier rejection FetchMarketPrices"+coinSymbol)
+			debugLogs("Found Empty on down barrier rejection FetchMarketPrices"+coinSymbol)
 			rejectionMutex.Unlock()
 			continue;
 		}
@@ -96,8 +100,9 @@ func RunDownBarrierRejection(){
 	
 		//fmt.Println("pricess",pricesArr[0]["price"])
 		currentPrice , ok := helpers.ToFloat64(pricesArr[0]["price"])
+		debugLogs("currentPrice",currentPrice)
 		if !ok || currentPrice == 0{
-			fmt.Println("currentPrice down barrier rejection Unsupported numeric type errored")
+			debugLogs("currentPrice down barrier rejection Unsupported numeric type errored")
 			rejectionMutex.Unlock()
 			continue;
 		}	
@@ -105,13 +110,14 @@ func RunDownBarrierRejection(){
 
 
 		currentDownBarrier, err := helpers.GetCurrentDownBarrier(coinSymbol,currentPrice)
+		debugLogs("currentDownBarrier",currentDownBarrier)
 		if err!=nil{
-			fmt.Println("GetCurrentDownBarrier down barrier rejection Error "+coinSymbol,err)
+			debugLogs("GetCurrentDownBarrier down barrier rejection Error "+coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue
 		}
 		if len(currentDownBarrier) == 0 || len(currentDownBarrier[0]) == 0 {
-			fmt.Println("currentDownBarrier is empty "+coinSymbol)
+			debugLogs("currentDownBarrier is empty "+coinSymbol)
 			rejectionMutex.Unlock()
 			continue
 		}
@@ -120,7 +126,7 @@ func RunDownBarrierRejection(){
 		if val , ok := currentDownBarrier[0]["barier_value"].(float64); ok{
 			current_down_barrier_value = val
 		} else {
-			fmt.Println("current_down_barrier_value is missing ",coinSymbol)
+			debugLogs("current_down_barrier_value is missing ",coinSymbol)
 			rejectionMutex.Unlock()
 			continue;
 		}
@@ -128,19 +134,20 @@ func RunDownBarrierRejection(){
 		if val , err := utils.ConvertToTime(currentDownBarrier[0]["created_date"]); err==nil{
 			current_barrier_time = val
 		} else {
-			fmt.Println("current_barrier_time is missing ",coinSymbol,err)
+			debugLogs("current_barrier_time is missing ",coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue;
 		}
 		
-		previousActiveBarrierFromCurrent ,err := helpers.GetLastDownBarrier(coinSymbol,current_barrier_time)	
+		previousActiveBarrierFromCurrent ,err := helpers.GetLastDownBarrier(coinSymbol,current_barrier_time)
+		debugLogs("previousActiveBarrierFromCurrent",previousActiveBarrierFromCurrent)	
 		if err!=nil{
-			fmt.Println("GetCurrentDownBarrier down barrier rejection Error "+coinSymbol,err)
+			debugLogs("GetCurrentDownBarrier down barrier rejection Error "+coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue
 		}
 		if len(previousActiveBarrierFromCurrent) == 0 || len(previousActiveBarrierFromCurrent[0]) == 0 {
-			fmt.Println("previousActiveBarrierFromCurrent is empty "+coinSymbol,previousActiveBarrierFromCurrent)
+			debugLogs("previousActiveBarrierFromCurrent is empty "+coinSymbol,previousActiveBarrierFromCurrent)
 			rejectionMutex.Unlock()
 			continue
 		}
@@ -149,7 +156,7 @@ func RunDownBarrierRejection(){
 		if val , ok := previousActiveBarrierFromCurrent[0]["barier_value"].(float64); ok{
 			last_down_barrier_value = val
 		} else {
-			//fmt.Println("last_down_barrier_value is missing ",coinSymbol)
+			debugLogs("last_down_barrier_value is missing ",coinSymbol)
 			rejectionMutex.Unlock()
 			continue;
 		}
@@ -157,20 +164,21 @@ func RunDownBarrierRejection(){
 		if val , err := utils.ConvertToTime(previousActiveBarrierFromCurrent[0]["created_date"]); err==nil{
 			last_barrier_time = val
 		} else {
-			fmt.Println("last_barrier_time is missing ",coinSymbol,err)
+			debugLogs("last_barrier_time is missing ",coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue;
 		}	
 		
 		// To Calculate Difference get Next High Point
-		nextHighPoint , err := helpers.GetNextSwingPoint(coinSymbol,last_barrier_time)	
+		nextHighPoint , err := helpers.GetNextSwingPoint(coinSymbol,last_barrier_time)
+		debugLogs("nextHighPoint",nextHighPoint)	
 		if err!=nil{
-			fmt.Println("GetNextSwingPoint down barrier rejection Error "+coinSymbol,err)
+			debugLogs("GetNextSwingPoint down barrier rejection Error "+coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue
 		}
 		if len(nextHighPoint) == 0 || len(nextHighPoint[0]) == 0 {
-			//fmt.Println("bodyMoveAverage is empty "+coinSymbol,bodyMoveAverage)
+			debugLogs("bodyMoveAverage is empty "+coinSymbol)
 			rejectionMutex.Unlock()
 			continue
 		}
@@ -179,15 +187,15 @@ func RunDownBarrierRejection(){
 		if val , ok := nextHighPoint[0]["barier_value"].(float64); ok{
 			next_high_point = val
 		} else {
-			//fmt.Println("next_high_point is missing ",coinSymbol)
+			debugLogs("next_high_point is missing ",coinSymbol)
 			rejectionMutex.Unlock()
 			continue;
 		}
-		var next_point_time time.Time
-		if val , ok := nextHighPoint[0]["created_date"].(time.Time); ok{
-			next_point_time = val
+		var high_point_time time.Time
+		if val , err := utils.ConvertToTime(nextHighPoint[0]["created_date"]); err==nil{
+			high_point_time = val
 		} else {
-			//fmt.Println("next_point_time is missing ",coinSymbol)
+			debugLogs("high_point_time is missing ",coinSymbol)
 			rejectionMutex.Unlock()
 			continue;
 		}	
@@ -198,8 +206,9 @@ func RunDownBarrierRejection(){
 			NextHighSwingPoint          : next_high_point,
 			CurrentDownBarrierTime      : current_barrier_time,
 			PreviousDownBarrierTime     : last_barrier_time,
-			NextHighSwingTime     		: next_point_time,
-			PointDiff                   : calculatePercentageDifference(last_down_barrier_value,next_high_point),
+			HighSwingTime     		    : high_point_time,
+			HighPointDiff               : calculatePercentageDifference(current_down_barrier_value,next_high_point),
+			LowPointDiff                : calculatePercentageDifference(current_down_barrier_value,last_down_barrier_value),
 			Triggered					: false,
 			Date						: currentHourDate,	
 			
@@ -209,11 +218,11 @@ func RunDownBarrierRejection(){
 		rejectionMutex.Unlock()
 	} // ends coinListCacheForBarrier forLoop
 	//fmt.Println("Time Now Data",time.Now().UTC())
-	
+	//debugLogs("barriersData",barriersData)	
 	for i, barrierData := range barriersData {
-		utils.PrintStructValues(barrierData);
+		//utils.PrintStructValues(barrierData);
 		if hasRejectionTimeChanged(hourChangeReset) {
-			fmt.Println("Breaking down barrier rejection after hour change", hourChangeReset, time.Now().UTC())
+			debugLogs("Breaking down barrier rejection after hour change", hourChangeReset, time.Now().UTC())
 			break
 		}
 		dataToParse := barrierData
@@ -232,23 +241,26 @@ func RunDownBarrierRejection(){
 		if currentDownValue < lastDownValue{
 			barrierDroped = true
 		}
-
+		debugLogs("currentEntry",barriersData[i])
 		if barrierDroped {
 			toTrigger := false
 			wickMove , err := helpers.GetCoinCurrentWickMove(coin)
 			if err!=nil{
-				fmt.Println("wickMove error for coin",coin)
+				debugLogs("wickMove error for coin",coin)
 				continue;	
 			}
 			if len(wickMove) == 0  || len(wickMove[0]) == 0 {
-				fmt.Println("wickMove Not Found For Coin",coin)
+				debugLogs("wickMove Not Found For Coin",coin)
 				continue;	
 			}
+			debugLogs("wickMove",wickMove)
 			var currentWickMove float64
 			currentWickMove , ok := helpers.ToFloat64(wickMove[0]["lower_wick_per_move"])
 			if !ok{
-				fmt.Println("currentWickMove Unsupported numeric type errored")
+				debugLogs("currentWickMove Unsupported numeric type errored")
 				continue;
+			} else {
+				barriersData[i].Wickvalue = currentWickMove
 			}
 			if wickMoveFactorValue <= currentWickMove {
 				toTrigger = true;	
@@ -258,10 +270,14 @@ func RunDownBarrierRejection(){
 				if id , ok := wickMove[0]["_id"].(primitive.ObjectID); ok{
 					barriersData[i].Triggered  = true
 					toUpdate := bson.M{
-						"db_current_barrier_value_used"   : currentDownValue,
-						"db_last_barrier_value_used" : lastDownValue,
-						"db_last_to_next_high_diff" : dataToParse.PointDiff,
-						"db_next_swing_from_last_barrier" : dataToParse.NextHighSwingTime,
+						"cdb_pulled"   : "yes",   // current Down Barrier Pulled.
+						"cdb_value"   : currentDownValue,
+						"cdb_last_value" : lastDownValue,
+						"cdb_diff_from_high" : dataToParse.HighPointDiff,
+						"cdb_diff_from_low" : dataToParse.LowPointDiff,
+						"cdb_swing_time" : dataToParse.HighSwingTime,
+						"cdb_low_time" : dataToParse.CurrentDownBarrierTime,
+						"cdb_last_low_time" : dataToParse.PreviousDownBarrierTime,
 						
 					}
 					err := helpers.UpdateDownBarrierRejectionData(id,toUpdate)
@@ -318,4 +334,21 @@ func GetHourStartTime(dateNow time.Time) time.Time {
 		startTime = time.Date(dateNow.Year(), dateNow.Month(), dateNow.Day(), dateNow.Hour(), 45, 0, 0, dateNow.Location())
 	}
 	return startTime
+}
+
+
+func debugLogs(msg string, params ...interface{}) {
+	if !debug{
+		return
+	}
+	fmt.Print(msg)
+
+	if len(params) > 0 {
+		fmt.Print(" Params:")
+		for i, param := range params {
+			fmt.Printf(" %d:%v", i+1, param)
+		}
+	}
+
+	fmt.Println()
 }

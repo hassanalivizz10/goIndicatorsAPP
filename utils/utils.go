@@ -165,7 +165,7 @@ func FormatTimeAgo(from time.Time, to time.Time) string {
 
 
 func ConvertToTime(value interface{}) (time.Time, error) {
-	checkType(value)
+	//checkType(value)
 	if t, ok := value.(time.Time); ok {
 		return t, nil // It's already a time.Time
 	}
