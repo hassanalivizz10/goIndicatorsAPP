@@ -461,14 +461,14 @@ func GetBodyMoveAverage(coin string) ([]bson.M,error) {
 	return docs , nil
 }
 
-func GetCoinCurrentWickMove(coin string) ([]bson.M,error) {
+func GetCoinCurrentWickMove(coin ,closeTime_human_readible string) ([]bson.M,error) {
 	collectionName := "market_chart"
 	var limit int64 = 1
 	var sortOrder int = -1
 	var sortBy string = "created_date"
 	filters  := bson.M{
 		"coin":                   coin,
-		// "openTime_human_readible": getStartOfCurrentHour(),
+		"closeTime_human_readible": closeTime_human_readible,
 	}
 	projection := bson.M{
 		"lower_wick_per_move" : 1,
@@ -716,14 +716,13 @@ func UpdateHourlyData(filters , toSet bson.M)error{
 	return nil
 }
 
-func GetCurrentDownBarrier(coin string,market_price float64)([]bson.M, error){
+func GetCurrentDownBarrier(coin string)([]bson.M, error){
 	collectionName := "barrier_values_collection"
 	
 	filters := bson.M{
 		"coin":coin,
 		"barrier_type":"down",
 		"barrier_status":"very_strong_barrier",
-		//"barier_value": bson.M{"$gte": market_price},
 	}
 	projection := bson.M{
 		"_id"           				 : 0 ,

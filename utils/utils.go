@@ -184,7 +184,7 @@ func ConvertToTime(value interface{}) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("unsupported type for conversion to time.Time")
 	}
 }
-func checkType(variable interface{}) {
+func CheckType(variable interface{}) {
 	v := reflect.ValueOf(variable)
 	t := v.Type()
 

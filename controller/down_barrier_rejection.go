@@ -34,7 +34,9 @@ type BarriersDataStruct struct {
 	LowPointDiff			    float64
 	Wickvalue					float64
 	Triggered					bool
-	BarrierDropped				bool 
+	BarrierDropped				bool
+	AddedForCurrentHour			bool
+	CurrentCandleID             primitive.ObjectID 
 }
 
 
@@ -77,39 +79,32 @@ func RunDownBarrierRejection(){
 			rejectionMutex.Unlock()
 			continue
 		}
-		
-		dateNow := time.Now().UTC()
-		// used from big_drop
-		startTime := GetHourStartTime(dateNow)
-		
-		
-	
-		pricesArr , err := helpers.FetchMarketPrices(coinSymbol, startTime)
-		
+		// only to verify if current candles data is set or not.
+		bodyMoveAverage, err := helpers.GetBodyMoveAverage(coinSymbol)
+		//fmt.Println("bodyMoveAverage",bodyMoveAverage)
 		if err!=nil{
-			debugLogs("ERROR ON down barrier rejection FetchMarketPrices"+coinSymbol,err)
+			debugLogs("bodyMoveAverage Error "+coinSymbol,err)
 			rejectionMutex.Unlock()
-			continue;
+			continue
 		}
-		if len(pricesArr) == 0  || len(pricesArr[0]) == 0 {
-			debugLogs("Found Empty on down barrier rejection FetchMarketPrices"+coinSymbol)
+		if len(bodyMoveAverage) == 0 || len(bodyMoveAverage[0]) == 0 {
+			debugLogs("bodyMoveAverage is empty for current Hour Down Barrier Rejection "+coinSymbol)
 			rejectionMutex.Unlock()
-			continue;
+			continue
 		}
-		var currentPrice float64
+		
+		var CurrentCandleID primitive.ObjectID 
+		if id , ok := bodyMoveAverage[0]["_id"].(primitive.ObjectID); ok{
+			CurrentCandleID =  id
+		}  else {
+			utils.CheckType(bodyMoveAverage[0]["_id"]);
+			debugLogs("CurrentCandleID is Invalid "+coinSymbol)
+			rejectionMutex.Unlock()
+			continue
+		}
 	
-		//fmt.Println("pricess",pricesArr[0]["price"])
-		currentPrice , ok := helpers.ToFloat64(pricesArr[0]["price"])
-		debugLogs("currentPrice",currentPrice)
-		if !ok || currentPrice == 0{
-			debugLogs("currentPrice down barrier rejection Unsupported numeric type errored")
-			rejectionMutex.Unlock()
-			continue;
-		}	
-
-
-
-		currentDownBarrier, err := helpers.GetCurrentDownBarrier(coinSymbol,currentPrice)
+		// Fetch Active Down Barrier and process the values started  .....
+		currentDownBarrier, err := helpers.GetCurrentDownBarrier(coinSymbol)
 		debugLogs("currentDownBarrier",currentDownBarrier)
 		if err!=nil{
 			debugLogs("GetCurrentDownBarrier down barrier rejection Error "+coinSymbol,err)
@@ -134,11 +129,13 @@ func RunDownBarrierRejection(){
 		if val , err := utils.ConvertToTime(currentDownBarrier[0]["created_date"]); err==nil{
 			current_barrier_time = val
 		} else {
-			debugLogs("current_barrier_time is missing ",coinSymbol,err)
+			debugLogs("current_barrier_time is missing or has error ",coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue;
 		}
-		
+		// Fetch Active Down Barrier and process the values ended  .....
+
+		// Fetch previous From Current Active Down Barrier and process the values started  .....
 		previousActiveBarrierFromCurrent ,err := helpers.GetLastDownBarrier(coinSymbol,current_barrier_time)
 		debugLogs("previousActiveBarrierFromCurrent",previousActiveBarrierFromCurrent)	
 		if err!=nil{
@@ -168,8 +165,10 @@ func RunDownBarrierRejection(){
 			rejectionMutex.Unlock()
 			continue;
 		}	
-		
-		// To Calculate Difference get Next High Point
+		// Fetch previous From Current Active Down Barrier and process the values ended  .....	
+
+
+		// Get the Current High To have difference between
 		nextHighPoint , err := helpers.GetNextSwingPoint(coinSymbol,last_barrier_time)
 		debugLogs("nextHighPoint",nextHighPoint)	
 		if err!=nil{
@@ -207,10 +206,11 @@ func RunDownBarrierRejection(){
 			CurrentDownBarrierTime      : current_barrier_time,
 			PreviousDownBarrierTime     : last_barrier_time,
 			HighSwingTime     		    : high_point_time,
-			HighPointDiff               : calculatePercentageDifference(current_down_barrier_value,next_high_point),
-			LowPointDiff                : calculatePercentageDifference(current_down_barrier_value,last_down_barrier_value),
+			HighPointDiff               : calculatePercentageDifference(last_down_barrier_value,next_high_point),
+			LowPointDiff                : calculatePercentageDifference(last_down_barrier_value,current_down_barrier_value),
 			Triggered					: false,
-			Date						: currentHourDate,	
+			Date						: currentHourDate,
+			CurrentCandleID             : CurrentCandleID,	
 			
 		}
 
@@ -226,73 +226,64 @@ func RunDownBarrierRejection(){
 			break
 		}
 		dataToParse := barrierData
+		// params to use
+		id := dataToParse.CurrentCandleID
 		coin := dataToParse.Symbol
-
+		lastDownTime := dataToParse.PreviousDownBarrierTime
+		wickMovetime := endOfHourString(lastDownTime)
 		isSet := dataToParse.Triggered
 		if isSet{
 			// already triggered for the hour..
 			continue
 		}
-		// check if current Barrier Dropped..
-		currentDownValue := dataToParse.CurrentDownBarrier
-		lastDownValue :=  dataToParse.LastDownBarrier
+	
+
 		
-		barrierDroped := false
-		if currentDownValue < lastDownValue{
-			barrierDroped = true
-		}
 		debugLogs("currentEntry",barriersData[i])
-		if barrierDroped {
-			toTrigger := false
-			wickMove , err := helpers.GetCoinCurrentWickMove(coin)
-			if err!=nil{
-				debugLogs("wickMove error for coin",coin)
-				continue;	
-			}
-			if len(wickMove) == 0  || len(wickMove[0]) == 0 {
-				debugLogs("wickMove Not Found For Coin",coin)
-				continue;	
-			}
-			debugLogs("wickMove",wickMove)
-			var currentWickMove float64
-			currentWickMove , ok := helpers.ToFloat64(wickMove[0]["lower_wick_per_move"])
-			if !ok{
-				debugLogs("currentWickMove Unsupported numeric type errored")
-				continue;
-			} else {
-				barriersData[i].Wickvalue = currentWickMove
-			}
-			if wickMoveFactorValue <= currentWickMove {
-				toTrigger = true;	
-			}
+		
 
-			if(toTrigger){
-				if id , ok := wickMove[0]["_id"].(primitive.ObjectID); ok{
-					barriersData[i].Triggered  = true
-					toUpdate := bson.M{
-						"cdb_pulled"   : "yes",   // current Down Barrier Pulled.
-						"cdb_value"   : currentDownValue,
-						"cdb_last_value" : lastDownValue,
-						"cdb_diff_from_high" : dataToParse.HighPointDiff,
-						"cdb_diff_from_low" : dataToParse.LowPointDiff,
-						"cdb_swing_time" : dataToParse.HighSwingTime,
-						"cdb_low_time" : dataToParse.CurrentDownBarrierTime,
-						"cdb_last_low_time" : dataToParse.PreviousDownBarrierTime,
-						
-					}
-					err := helpers.UpdateDownBarrierRejectionData(id,toUpdate)
-					if err!=nil{
-						continue;
-					}
-				}
-			}
-
+		wickMove , err := helpers.GetCoinCurrentWickMove(coin,wickMovetime)
+		if err!=nil{
+			debugLogs("wickMove error for coin",coin)
+			continue;	
 		}
-
+		if len(wickMove) == 0  || len(wickMove[0]) == 0 {
+			debugLogs("wickMove Not Found For Coin",coin)
+			continue;	
+		}
+		debugLogs("wickMove",wickMove)
+		var currentWickMove float64
+		currentWickMove , ok := helpers.ToFloat64(wickMove[0]["lower_wick_per_move"])
+		if !ok{
+			debugLogs("currentWickMove Unsupported numeric type errored")
+			continue;
+		} else {
+			barriersData[i].Wickvalue = currentWickMove
+		}
+		
 
 		
-		//fmt.Println("RaiseFound"+coin,RaiseFound)
-		//fmt.Println("DropFound"+coin,DropFound)
+		
+		barriersData[i].Triggered  = true
+		toUpdate := bson.M{
+			"cdb_pulled"   : "yes",   // current Down Barrier Pulled.
+			"cdb_value"   : dataToParse.CurrentDownBarrier,
+			"cdb_last_value" : dataToParse.LastDownBarrier,
+			"cdb_diff_from_high" : dataToParse.HighPointDiff,
+			"cdb_diff_from_low" : dataToParse.LowPointDiff,
+			"cdb_swing_time" : dataToParse.HighSwingTime,
+			"cdb_low_time" : dataToParse.CurrentDownBarrierTime,
+			"cdb_last_low_time" : dataToParse.PreviousDownBarrierTime,
+			"cdb_pulled_time": time.Now().UTC(),
+			"cdb_wick_value" : currentWickMove,
+			"cdb_high_value" : dataToParse.NextHighSwingPoint,
+			
+		}
+		err = helpers.UpdateDownBarrierRejectionData(id,toUpdate)
+		if err!=nil{
+			continue;
+		}
+	
 		
 	} // ends barriersData loop
 }
@@ -351,4 +342,12 @@ func debugLogs(msg string, params ...interface{}) {
 	}
 
 	fmt.Println()
+}
+
+func endOfHourString(inputTime time.Time) string {
+	// Set the time to the beginning of the next hour and subtract one second
+	endOfHourTime := inputTime.Add(time.Hour - time.Second)
+	
+	// Format the time as a string
+	return endOfHourTime.Format("2006-01-02 15:04:05")
 }
