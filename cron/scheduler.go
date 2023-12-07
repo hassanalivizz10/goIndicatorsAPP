@@ -18,11 +18,11 @@ func StartCronJobs() {
      
 
     _ , _ = c.AddFunc("*/1 * * * *", controller.RunDownBarrierRejection)  // every 1 minute.
-    _, _ = c.AddFunc("@every 5s", controller.RunBigRaiseAndBigDrop)  // every 5s
-    _, _ = c.AddFunc("@every 10s", controller.BigRaisePullBack) // every 10s
-   _, _ = c.AddFunc("@every 10s", controller.BigDropPullBack)  // every 10s
-    _, _ = c.AddFunc("12 * * * *", controller.StrategyCron)  // every hour 12th minute
-    _ , _ = c.AddFunc("0 * * * *", controller.RecycleTheTrack)   // every hour start
+  //   _, _ = c.AddFunc("@every 5s", controller.RunBigRaiseAndBigDrop)  // every 5s
+  //   _, _ = c.AddFunc("@every 10s", controller.BigRaisePullBack) // every 10s
+  //  _, _ = c.AddFunc("@every 10s", controller.BigDropPullBack)  // every 10s
+  //   _, _ = c.AddFunc("12 * * * *", controller.StrategyCron)  // every hour 12th minute
+  //   _ , _ = c.AddFunc("0 * * * *", controller.RecycleTheTrack)   // every hour start
 
 
  

@@ -19,7 +19,7 @@ var coinListCacheForBarrier []bson.M
 var rejectionMutex sync.Mutex
 // Defaults ....
 var wickMoveFactorValue  float64  = 2
-var debug = false
+var debug = true
 
 type BarriersDataStruct struct {
 	Symbol                 		string 
@@ -197,6 +197,12 @@ func RunDownBarrierRejection(){
 			debugLogs("high_point_time is missing ",coinSymbol)
 			rejectionMutex.Unlock()
 			continue;
+		}
+		point1_val := current_down_barrier_value
+		point2_val := last_down_barrier_value
+		if last_down_barrier_value < last_down_barrier_value {
+			point1_val = current_down_barrier_value
+			point2_val = last_down_barrier_value
 		}	
 		barrierObject := BarriersDataStruct{
 			Symbol                 		: coinSymbol ,
@@ -207,7 +213,7 @@ func RunDownBarrierRejection(){
 			PreviousDownBarrierTime     : last_barrier_time,
 			HighSwingTime     		    : high_point_time,
 			HighPointDiff               : calculatePercentageDifference(last_down_barrier_value,next_high_point),
-			LowPointDiff                : calculatePercentageDifference(last_down_barrier_value,current_down_barrier_value),
+			LowPointDiff                : calculatePercentageDifference(point1_val,point2_val),
 			Triggered					: false,
 			Date						: currentHourDate,
 			CurrentCandleID             : CurrentCandleID,	
@@ -260,8 +266,10 @@ func RunDownBarrierRejection(){
 		} else {
 			barriersData[i].Wickvalue = currentWickMove
 		}
-		
-
+		activeDownBarrier:=  dataToParse.LastDownBarrier
+		if  dataToParse.LowPointDiff >= 1 {
+			activeDownBarrier =  dataToParse.CurrentDownBarrier
+		}
 		
 		
 		barriersData[i].Triggered  = true
@@ -271,6 +279,7 @@ func RunDownBarrierRejection(){
 			"cdb_last_value" : dataToParse.LastDownBarrier,
 			"cdb_diff_from_high" : dataToParse.HighPointDiff,
 			"cdb_diff_from_low" : dataToParse.LowPointDiff,
+			"cdb_diff_from_low_value" : activeDownBarrier,
 			"cdb_swing_time" : dataToParse.HighSwingTime,
 			"cdb_low_time" : dataToParse.CurrentDownBarrierTime,
 			"cdb_last_low_time" : dataToParse.PreviousDownBarrierTime,
@@ -279,6 +288,11 @@ func RunDownBarrierRejection(){
 			"cdb_high_value" : dataToParse.NextHighSwingPoint,
 			
 		}
+		debugLogs("data",toUpdate)
+		if(debug){
+			return
+		}
+
 		err = helpers.UpdateDownBarrierRejectionData(id,toUpdate)
 		if err!=nil{
 			continue;
