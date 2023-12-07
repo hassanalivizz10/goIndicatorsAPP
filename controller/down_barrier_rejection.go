@@ -19,7 +19,7 @@ var coinListCacheForBarrier []bson.M
 var rejectionMutex sync.Mutex
 // Defaults ....
 var wickMoveFactorValue  float64  = 2
-var debug = true
+var debug = false
 
 type BarriersDataStruct struct {
 	Symbol                 		string 
@@ -198,9 +198,9 @@ func RunDownBarrierRejection(){
 			rejectionMutex.Unlock()
 			continue;
 		}
-		point1_val := current_down_barrier_value
-		point2_val := last_down_barrier_value
-		if last_down_barrier_value < last_down_barrier_value {
+		point1_val := last_down_barrier_value
+		point2_val := current_down_barrier_value
+		if last_down_barrier_value > last_down_barrier_value {
 			point1_val = current_down_barrier_value
 			point2_val = last_down_barrier_value
 		}	
