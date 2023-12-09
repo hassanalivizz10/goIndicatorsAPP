@@ -290,7 +290,7 @@ func RunDownBarrierRejection(){
 		}
 		debugLogs("data",toUpdate)
 		if(debug){
-			return
+			//return
 		}
 
 		err = helpers.UpdateDownBarrierRejectionData(id,toUpdate)
