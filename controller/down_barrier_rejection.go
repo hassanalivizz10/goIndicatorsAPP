@@ -52,7 +52,7 @@ func RunDownBarrierRejection(){
 	currentHourDate := time.Date(currentDateTime.Year(), currentDateTime.Month(), currentDateTime.Day(), currentDateTime.Hour(), 0, 0, 0, currentDateTime.Location())
 
 	if hourChangeReset.IsZero() || currentHourDate.After(hourChangeReset) {
-		//fmt.Println("Listing coins")
+		fmt.Println("RunDownBarrierRejection ",currentHourDate)
 		barriersData = nil
 		hourChangeReset = currentHourDate
 	}
