@@ -19,7 +19,7 @@ var coinListCacheForBarrier []bson.M
 var rejectionMutex sync.Mutex
 // Defaults ....
 var wickMoveFactorValue  float64  = 2
-var debug = false
+var debug = true
 
 type BarriersDataStruct struct {
 	Symbol                 		string 
