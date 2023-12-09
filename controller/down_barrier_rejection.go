@@ -56,7 +56,7 @@ func RunDownBarrierRejection(){
 		barriersData = nil
 		hourChangeReset = currentHourDate
 	}
-
+	debugLogs("RunDownBarrierRejection currentDateTime",currentDateTime)
 	if len(coinListCacheForBarrier) ==0 {
 		coinList , err := helpers.ListCoins()
 		if err!=nil{
