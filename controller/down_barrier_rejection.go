@@ -50,7 +50,11 @@ rejectionMutex.Unlock() // Release the mutex when done
 func RunDownBarrierRejection(){
 	currentDateTime := time.Now().UTC()
 	currentHourDate := time.Date(currentDateTime.Year(), currentDateTime.Month(), currentDateTime.Day(), currentDateTime.Hour(), 0, 0, 0, currentDateTime.Location())
-
+	if currentDateTime.Minute() < 3 {
+		fmt.Println("It's the first 3 minutes of the hour! Returning as some candles data might not exists...")
+		// You can replace the following line with the action you want to take if the condition is true.
+		return;
+	}
 	if hourChangeReset.IsZero() || currentHourDate.After(hourChangeReset) {
 		fmt.Println("RunDownBarrierRejection ",currentHourDate)
 		barriersData = nil
@@ -80,24 +84,26 @@ func RunDownBarrierRejection(){
 			continue
 		}
 		// only to verify if current candles data is set or not.
-		bodyMoveAverage, err := helpers.GetBodyMoveAverage(coinSymbol)
-		//fmt.Println("bodyMoveAverage",bodyMoveAverage)
+		currentHourCandleID, err := helpers.CurrentHourCandleID(coinSymbol)
+		//fmt.Println("CurrentHourCandleID",CurrentHourCandleID)
 		if err!=nil{
-			debugLogs("bodyMoveAverage Error "+coinSymbol,err)
+			debugLogs("currentHourCandleID Error "+coinSymbol,err)
 			rejectionMutex.Unlock()
 			continue
 		}
-		if len(bodyMoveAverage) == 0 || len(bodyMoveAverage[0]) == 0 {
-			debugLogs("bodyMoveAverage is empty for current Hour Down Barrier Rejection "+coinSymbol)
+		// fmt.Println(currentHourCandleID);
+		// return;
+		if len(currentHourCandleID) == 0 || len(currentHourCandleID[0]) == 0 {
+			debugLogs("currentHourCandleID is empty for current Hour Down Barrier Rejection "+coinSymbol)
 			rejectionMutex.Unlock()
 			continue
 		}
 		
 		var CurrentCandleID primitive.ObjectID 
-		if id , ok := bodyMoveAverage[0]["_id"].(primitive.ObjectID); ok{
+		if id , ok := currentHourCandleID[0]["_id"].(primitive.ObjectID); ok{
 			CurrentCandleID =  id
 		}  else {
-			utils.CheckType(bodyMoveAverage[0]["_id"]);
+			utils.CheckType(currentHourCandleID[0]["_id"]);
 			debugLogs("CurrentCandleID is Invalid "+coinSymbol)
 			rejectionMutex.Unlock()
 			continue
@@ -177,7 +183,7 @@ func RunDownBarrierRejection(){
 			continue
 		}
 		if len(nextHighPoint) == 0 || len(nextHighPoint[0]) == 0 {
-			debugLogs("bodyMoveAverage is empty "+coinSymbol)
+			debugLogs("CurrentHourCandleID is empty "+coinSymbol)
 			rejectionMutex.Unlock()
 			continue
 		}

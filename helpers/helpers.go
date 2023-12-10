@@ -436,6 +436,25 @@ func getStartOfCurrentHour() string {
 	return strDate
 }
 
+func CurrentHourCandleID(coin string) ([]bson.M,error) {
+	collectionName := "market_chart"
+	var limit int64 = 1
+	var sortOrder int = -1
+	var sortBy string = "created_date"
+	filters  := bson.M{
+		"coin":                   coin,
+		// "openTime_human_readible": getStartOfCurrentHour(),
+	}
+	projection := bson.M{
+		"close":                 1,
+	}
+	docs ,err := mongohelpers.MongoFind(collectionName, filters,projection, limit, sortOrder, sortBy)
+	if err!=nil{
+		return []bson.M{} , err
+	}
+	return docs , nil
+}
+
 func GetBodyMoveAverage(coin string) ([]bson.M,error) {
 	collectionName := "market_chart"
 	var limit int64 = 1
