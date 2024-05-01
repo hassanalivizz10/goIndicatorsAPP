@@ -31,11 +31,11 @@ func TrendsPostCron() {
 			continue
 		}
 		trend, err := helpers.CurrentCandelTrend(coinSymbol)
-		fmt.Println("err", err)
+		//fmt.Println("err", err)
 		if err != nil {
 			continue // something went wrong.
 		}
-		fmt.Println("trend", trend)
+		//fmt.Println("trend", trend)
 		// Check if trend is not empty
 		if trendValue, ok := trend["candel_trends"].(string); ok && trendValue != "" {
 			// Replace "strong_" from trend value
