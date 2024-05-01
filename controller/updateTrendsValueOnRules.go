@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"indicatorsAPP/helpers"
 	"net/http"
 	"strings"
-
-	"indicatorsAPP/helpers"
+	"time"
 )
 
-var httpClient = http.Client{} // Reuse HTTP client
+var httpClient = http.Client{
+	Timeout: 5 * time.Second, // Set a timeout for the HTTP client
+}
 
 func TrendsPostCron() {
 	fmt.Println("Inside TrendsPostCron Cron")
@@ -25,15 +27,20 @@ func TrendsPostCron() {
 
 	for _, coin := range coinListCacheData {
 		coinSymbol := coin["symbol"].(string)
+		if coinSymbol != "QTUMBTC" {
+			continue
+		}
 		trend, err := helpers.CurrentCandelTrend(coinSymbol)
+		fmt.Println("err", err)
 		if err != nil {
 			continue // something went wrong.
 		}
+		fmt.Println("trend", trend)
 		// Check if trend is not empty
 		if trendValue, ok := trend["candel_trends"].(string); ok && trendValue != "" {
 			// Replace "strong_" from trend value
 			trendValue = strings.Replace(trendValue, "strong_", "", 1)
-
+			fmt.Println("trendValue", trendValue)
 			// Post trend value
 			if err := postTrendValue(coinSymbol, trendValue); err != nil {
 				fmt.Printf("Error posting trend value for %s: %v\n", coinSymbol, err)
@@ -52,6 +59,7 @@ func postTrendValue(coin, trend string) error {
 		"coin":  coin,  // Example coin value
 		"trend": trend, // Example trend value
 	})
+	fmt.Println("err", err)
 	if err != nil {
 		return err
 	}
@@ -61,7 +69,7 @@ func postTrendValue(coin, trend string) error {
 		return err
 	}
 
-	req.Header.Set("mytoken", "trendValues#_cgA3s8VSQj")
+	req.Header.Set("authorization", "trendValues#_cgA3s8VSQj")
 	req.Header.Set("content-type", "application/json")
 
 	resp, err := httpClient.Do(req)
