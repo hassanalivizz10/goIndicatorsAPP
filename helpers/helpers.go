@@ -831,11 +831,15 @@ func CurrentCandelTrend(coin string) (bson.M, error) {
 	}
 
 	// Retrieve only the latest document
-	result, err := mongohelpers.MongoFindOne(collectionName, filters, projection)
+	var limit int64 = 1
+	var sortOrder int = -1
+	sortBy := "created_date"
+	docs, err := mongohelpers.MongoFind(collectionName, filters, projection, limit, sortOrder, sortBy)
 	if err != nil {
 		return bson.M{}, err
 	}
-
-	// Return the result
-	return result, nil
+	if len(docs) > 0 {
+		return docs[0], nil
+	}
+	return bson.M{}, nil
 }
